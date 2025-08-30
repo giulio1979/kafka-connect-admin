@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  broker:
+    image: apache/kafka:latest
+    hostname: broker
+    container_name: broker
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:29093
+      KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+  schemareg1:
+    image: confluentinc/cp-schema-registry:7.3.0
+    container_name: ca_schemareg1
+    depends_on:
+      - broker
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: "schemareg1"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "broker:29092"
+
+  schemareg2:
+    image: confluentinc/cp-schema-registry:7.3.0
+    container_name: ca_schemareg2
+    depends_on:
+      - broker
+    ports:
+      - "8082:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: "schemareg2"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "broker:29092"
+  connect:
+    image: quay.io/strimzi/kafka:latest-kafka-3.9.1
+    container_name: ca_connect
+    depends_on:
+      - broker
+      - schemareg1
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: "broker:29092"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect"
+      CONNECT_REST_PORT: "8083"
+      KAFKA_LOG_DIRS: "/tmp/kafka-logs"
+      CONNECT_GROUP_ID: "connect-cluster"
+      CONNECT_CONFIG_STORAGE_TOPIC: "connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "connect-status"
+      CONNECT_PLUGIN_PATH: "/opt/kafka/plugins"
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      # StringConverter does not use a schema registry URL
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+    volumes:
+      - ./docker/connect-plugins:/opt/kafka/plugins
+      - ./docker/input:/tmp/input
+      - ./docker/connect-distributed.properties:/opt/kafka/config/connect-distributed.properties:ro
+    command: ["sh","-c","mkdir -p /tmp/kafka-logs && exec /opt/kafka/bin/connect-distributed.sh /opt/kafka/config/connect-distributed.properties"]
+
+  connector-init:
+    image: curlimages/curl:latest
+    container_name: ca_connector_init
+    depends_on:
+      - connect
+    volumes:
+      - ./docker/connector.json:/tmp/connector.json:ro
+    entrypoint: ["sh","-c","until curl -sSf http://connect:8083/; do sleep 1; done; echo 'Registering connector'; curl -sS -X POST -H 'Content-Type: application/json' --data @/tmp/connector.json http://connect:8083/connectors || true; sleep 2"]
+
+volumes:
+  broker-data:
+
+
+

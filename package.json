@@ -1,0 +1,28 @@
+{
+  "name": "connect-admin",
+  "displayName": "Connect Admin",
+  "version": "0.0.1",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "main": "out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "test": "jest --config jest.config.js --runInBand",
+    "lint": "eslint . --ext .ts"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.3",
+    "@types/node": "^20.4.2",
+    "jest": "^29.6.1",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.1.6"
+  }
+  ,
+  "dependencies": {
+    "axios": "^1.4.0"
+  }
+}
