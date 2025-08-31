@@ -26,7 +26,7 @@ services:
 
   schemareg1:
     image: confluentinc/cp-schema-registry:7.3.0
-    container_name: ca_schemareg1
+    container_name: schemareg1
     depends_on:
       - broker
     ports:
@@ -38,7 +38,7 @@ services:
 
   schemareg2:
     image: confluentinc/cp-schema-registry:7.3.0
-    container_name: ca_schemareg2
+    container_name: schemareg2
     depends_on:
       - broker
     ports:
@@ -72,7 +72,7 @@ services:
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
     volumes:
-      - ./docker/connect-plugins:/opt/kafka/plugins
+      - ./docker/connect-plugins:/opt/kafka/plugins/demo/
       - ./docker/test.txt:/tmp/test.txt
       - ./docker/connect-distributed.properties:/opt/kafka/config/connect-distributed.properties:ro
     command: ["sh","-c","mkdir -p /tmp/kafka-logs && exec /opt/kafka/bin/connect-distributed.sh /opt/kafka/config/connect-distributed.properties"]

@@ -141,7 +141,10 @@ export class ConnectorView {
     <div id="connState" style="margin-bottom:12px;font-size:16px;font-weight:bold;padding:6px 12px;border-radius:4px;background:#e3f2fd;color:#1976d2;display:inline-block;">
       State: ${typeof status === 'object' && status && status.connector && status.connector.state ? status.connector.state : 'unknown'}
     </div>
-  <!-- Status removed as requested -->
+    <details style="margin-bottom:12px;">
+      <summary style="font-weight:bold;cursor:pointer;">Detailed Connector Status (JSON)</summary>
+      <textarea id="detailedStatusArea" readonly style="width:100%;height:180px;resize:vertical;">${safe(status)}</textarea>
+    </details>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
     <h3 style="margin:0;">Offsets</h3>
     <button id="editOffsets">Edit</button>
@@ -206,9 +209,9 @@ export class ConnectorView {
             if (errorDiv) errorDiv.style.display = 'none';
           }
           if (msg.cmd === 'update') {
-            const s = document.getElementById('statusArea');
+            const detailedStatus = document.getElementById('detailedStatusArea');
             const o = document.getElementById('offsetsEditor');
-            if (s) s.value = JSON.stringify(msg.status, null, 2);
+            if (detailedStatus) detailedStatus.value = JSON.stringify(msg.status, null, 2);
             if (o) o.value = JSON.stringify(msg.offsets, null, 2);
             if (o) o.readOnly = true;
             const editBtn = document.getElementById('editOffsets');
