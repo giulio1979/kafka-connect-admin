@@ -73,7 +73,7 @@ services:
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
     volumes:
       - ./docker/connect-plugins:/opt/kafka/plugins
-      - ./docker/input:/tmp/input
+      - ./docker/test.txt:/tmp/test.txt
       - ./docker/connect-distributed.properties:/opt/kafka/config/connect-distributed.properties:ro
     command: ["sh","-c","mkdir -p /tmp/kafka-logs && exec /opt/kafka/bin/connect-distributed.sh /opt/kafka/config/connect-distributed.properties"]
 

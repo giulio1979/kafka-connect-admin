@@ -7,6 +7,108 @@
     "vscode": "^1.60.0"
   },
   "main": "out/extension.js",
+  "activationEvents": [
+    "onCommand:connectAdmin.hello",
+    "onCommand:connectAdmin.addConnection",
+    "onCommand:connectAdmin.editConnection",
+    "onCommand:connectAdmin.removeConnection",
+    "onCommand:connectAdmin.testConnection",
+    "onCommand:connectAdmin.refreshConnections",
+    "onCommand:connectAdmin.connector.pause",
+    "onCommand:connectAdmin.connector.resume",
+    "onCommand:connectAdmin.connector.showOffsets",
+    "onView:connectAdmin.connections"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "connectAdmin.hello",
+        "title": "Connect Admin: Hello"
+      },
+      {
+        "command": "connectAdmin.addConnection",
+        "title": "Connect Admin: Add Connection"
+      },
+      {
+        "command": "connectAdmin.editConnection",
+        "title": "Connect Admin: Edit Connection"
+      },
+      {
+        "command": "connectAdmin.removeConnection",
+        "title": "Connect Admin: Remove Connection"
+      },
+      {
+        "command": "connectAdmin.testConnection",
+        "title": "Connect Admin: Test Connection"
+      },
+      {
+        "command": "connectAdmin.refreshConnections",
+        "title": "Connect Admin: Refresh"
+      },
+      {
+        "command": "connectAdmin.connector.pause",
+        "title": "Pause Connector"
+      },
+      {
+        "command": "connectAdmin.connector.resume",
+        "title": "Resume Connector"
+      },
+      {
+        "command": "connectAdmin.connector.showOffsets",
+        "title": "Show Offsets"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "connectAdmin.connections",
+          "name": "Connect Admin",
+    "icon": "images/icon.svg"
+        }
+      ]
+    }
+  },
+  "menus": {
+    "view/item/context": [
+      {
+        "when": "view == connectAdmin.connections && viewItem == connector",
+        "command": "connectAdmin.connector.pause",
+        "group": "inline"
+      },
+      {
+        "when": "view == connectAdmin.connections && viewItem == connector",
+        "command": "connectAdmin.connector.resume",
+        "group": "inline"
+      },
+      {
+        "when": "view == connectAdmin.connections && viewItem == connector",
+        "command": "connectAdmin.connector.showOffsets",
+        "group": "inline"
+      },
+      {
+        "when": "view == connectAdmin.connections && viewItem == connection",
+        "command": "connectAdmin.editConnection",
+        "group": "inline"
+      },
+      {
+        "when": "view == connectAdmin.connections && viewItem == connection",
+        "command": "connectAdmin.removeConnection",
+        "group": "inline"
+      }
+    ],
+    "view/title": [
+      {
+        "when": "view == connectAdmin.connections",
+        "command": "connectAdmin.addConnection",
+        "group": "navigation"
+      },
+      {
+        "when": "view == connectAdmin.connections",
+        "command": "connectAdmin.refreshConnections",
+        "group": "navigation"
+      }
+    ]
+  },
   "scripts": {
     "vscode:prepublish": "npm run build",
     "build": "tsc -p ./",

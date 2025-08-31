@@ -15,13 +15,13 @@ export class SchemaRegistryClient {
   async listSubjects(): Promise<string[]> {
     const res = await fetch(`${this.baseUrl}/subjects`, { headers: this.headers });
     if (!res.ok) throw new Error(`Failed to list subjects: ${res.status}`);
-    return res.json();
+  return (await res.json()) as string[];
   }
 
   async getVersions(subject: string): Promise<number[]> {
     const res = await fetch(`${this.baseUrl}/subjects/${encodeURIComponent(subject)}/versions`, { headers: this.headers });
     if (!res.ok) throw new Error(`Failed to get versions: ${res.status}`);
-    return res.json();
+  return (await res.json()) as number[];
   }
 
   async getSchema(subject: string, version: string | number): Promise<any> {
