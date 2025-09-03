@@ -23,8 +23,11 @@ export class ConnectionStore implements vscode.Disposable {
   async listConnections(): Promise<ConnectionMeta[]> {
     const raw = this.context.globalState.get<string>(CONNECTIONS_KEY, '[]');
     try {
-      return JSON.parse(raw) as ConnectionMeta[];
+      const connections = JSON.parse(raw) as ConnectionMeta[];
+      console.log('listConnections:', connections); // Debug log
+      return connections;
     } catch (e) {
+      console.error('Error parsing connections:', e); // Debug log
       return [];
     }
   }
@@ -36,7 +39,9 @@ export class ConnectionStore implements vscode.Disposable {
   async addConnection(conn: ConnectionMeta, secret?: string) {
     const conns = await this.listConnections();
     conns.push(conn);
+    console.log('addConnection - before save:', conns); // Debug log
     await this.saveConnections(conns);
+    console.log('addConnection - after save:', conns); // Debug log
     if (secret) await this.setSecret(conn.id, secret);
   }
 

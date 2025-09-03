@@ -1,8 +1,8 @@
 {
-  "name": "connect-admin",
+  "name": "kafka-connect-admin",
   "displayName": "Connect Admin",
   "version": "0.0.1",
-  "publisher": "your-name",
+  "publisher": "Iulius Hutuleac",
   "engines": {
     "vscode": "^1.60.0"
   },
@@ -23,27 +23,43 @@
     "commands": [
       {
         "command": "connectAdmin.hello",
-        "title": "Connect Admin: Hello"
+        "title": "Hello"
+      },
+      {
+        "command": "connectAdmin.openEditConnection",
+        "title": "Open Edit Connection"
+      },
+      {
+        "command": "connectAdmin.openConnectionManager",
+        "title": "Open Connection Manager"
+      },
+      {
+        "command": "connectAdmin.copySchemaVersion",
+        "title": "Copy Schema Version"
+      },
+      {
+        "command": "connectAdmin.pasteSchemaVersion",
+        "title": "Paste Schema Version"
       },
       {
         "command": "connectAdmin.addConnection",
-        "title": "Connect Admin: Add Connection"
+        "title": "Add Connection"
       },
       {
         "command": "connectAdmin.editConnection",
-        "title": "Connect Admin: Edit Connection"
+        "title": "Edit Connection"
       },
       {
         "command": "connectAdmin.removeConnection",
-        "title": "Connect Admin: Remove Connection"
+        "title": "Remove Connection"
       },
       {
         "command": "connectAdmin.testConnection",
-        "title": "Connect Admin: Test Connection"
+        "title": "Test Connection"
       },
       {
         "command": "connectAdmin.refreshConnections",
-        "title": "Connect Admin: Refresh"
+        "title": "Refresh"
       },
       {
         "command": "connectAdmin.connector.pause",
@@ -56,6 +72,22 @@
       {
         "command": "connectAdmin.connector.showOffsets",
         "title": "Show Offsets"
+      },
+      {
+        "command": "connectAdmin.copySchema",
+        "title": "Copy Schema"
+      },
+      {
+        "command": "connectAdmin.pasteSchema",
+        "title": "Paste Schema"
+      },
+      {
+        "command": "connectAdmin.pasteSchemaToConnection",
+        "title": "Paste Schema to Connection"
+      },
+      {
+        "command": "connectAdmin.testOfficialClient",
+        "title": "Test Official Client"
       }
     ],
     "views": {
@@ -63,51 +95,81 @@
         {
           "id": "connectAdmin.connections",
           "name": "Connect Admin",
-    "icon": "images/icon.svg"
+          "icon": "images/icon.svg"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "when": "view == connectAdmin.connections && viewItem == connector",
+          "command": "connectAdmin.connector.pause",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connector",
+          "command": "connectAdmin.connector.resume",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connector",
+          "command": "connectAdmin.connector.showOffsets",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connection",
+          "command": "connectAdmin.editConnection",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connection",
+          "command": "connectAdmin.removeConnection",
+          "group": "2_deletion"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaVersion",
+          "command": "connectAdmin.copySchemaVersion",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaSubject",
+          "command": "connectAdmin.copySchema",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaSubject",
+          "command": "connectAdmin.pasteSchema",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connection.schemaRegistry",
+          "command": "connectAdmin.pasteSchemaToConnection",
+          "group": "1_modification"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connection.schemaRegistry",
+          "command": "connectAdmin.testOfficialClient",
+          "group": "2_test"
+        },
+        {
+          "when": "view == connectAdmin.connections",
+          "command": "connectAdmin.refreshConnections",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "when": "view == connectAdmin.connections",
+          "command": "connectAdmin.openConnectionManager",
+          "group": "navigation"
+        },
+        {
+          "when": "view == connectAdmin.connections",
+          "command": "connectAdmin.refreshConnections",
+          "group": "navigation"
         }
       ]
     }
-  },
-  "menus": {
-    "view/item/context": [
-      {
-        "when": "view == connectAdmin.connections && viewItem == connector",
-        "command": "connectAdmin.connector.pause",
-        "group": "inline"
-      },
-      {
-        "when": "view == connectAdmin.connections && viewItem == connector",
-        "command": "connectAdmin.connector.resume",
-        "group": "inline"
-      },
-      {
-        "when": "view == connectAdmin.connections && viewItem == connector",
-        "command": "connectAdmin.connector.showOffsets",
-        "group": "inline"
-      },
-      {
-        "when": "view == connectAdmin.connections && viewItem == connection",
-        "command": "connectAdmin.editConnection",
-        "group": "inline"
-      },
-      {
-        "when": "view == connectAdmin.connections && viewItem == connection",
-        "command": "connectAdmin.removeConnection",
-        "group": "inline"
-      }
-    ],
-    "view/title": [
-      {
-        "when": "view == connectAdmin.connections",
-        "command": "connectAdmin.addConnection",
-        "group": "navigation"
-      },
-      {
-        "when": "view == connectAdmin.connections",
-        "command": "connectAdmin.refreshConnections",
-        "group": "navigation"
-      }
-    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
@@ -122,9 +184,9 @@
     "jest": "^29.6.1",
     "ts-jest": "^29.1.0",
     "typescript": "^5.1.6"
-  }
-  ,
+  },
   "dependencies": {
+    "@confluentinc/schemaregistry": "^1.4.1",
     "axios": "^1.4.0"
   }
 }
