@@ -3,6 +3,7 @@ import { ConnectionStore, ConnectionMeta, ConnectionType } from './connectionSto
 import { ConnectionsTreeProvider } from './views/connectionsTree';
 import { ConnectorView } from './views/connectorView';
 import { OffsetEditor } from './views/offsetEditor';
+import { SchemaView } from './views/schemaView';
 import { getOutputChannel } from './logger';
 import { OfficialSchemaRegistryClient } from './clients/officialSchemaRegistryClient';
 
@@ -37,6 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.window.registerTreeDataProvider('connectAdmin.connections', treeProvider);
   const connectorView = new ConnectorView(context);
   const offsetEditor = new OffsetEditor(context);
+  const schemaView = new SchemaView(context);
 
   context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.hello', () => {
   vscode.window.showInformationMessage('Connect Admin extension activated');
@@ -93,7 +95,7 @@ export function activate(context: vscode.ExtensionContext) {
     // reuse the ConnectorView API which expects a node-like object
     try {
       // use the existing ConnectorView instance to open the connector
-      await connectorView.open(connectorNodePayload.meta as any, connectorNodePayload.name as string);
+      await connectorView.open(connectorNodePayload.meta as any, connectorNodePayload.name as string, store);
     } catch (e:any) { vscode.window.showErrorMessage(`Failed to open connector: ${e.message || e}`); }
   }));
 
@@ -104,17 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
     const subject = node.subject as string;
     const version = node.version;
     try {
-      const { SchemaRegistryClient } = await import('./clients/schemaRegistryClient');
-      const client = new SchemaRegistryClient({ baseUrl: meta.url, name: meta.name });
-      const schema = await client.getSchema(subject, version);
-      // Show schema in a webview
-      const panel = (vscode as any).window.createWebviewPanel(
-        'schemaVersionView',
-        `Schema: ${subject} v${version}`,
-        { viewColumn: (vscode as any).ViewColumn.Active, preserveFocus: false },
-        { enableScripts: true }
-      );
-      panel.webview.html = `<html><body><h2>${subject} v${version}</h2><pre style='white-space:pre-wrap;font-family:monospace;background:#f6f8fa;padding:12px;border-radius:4px;'>${JSON.stringify(schema, null, 2).replace(/</g,'&lt;')}</pre></body></html>`;
+      await schemaView.open(meta, subject, version, store);
     } catch (e: any) {
       vscode.window.showErrorMessage(`Failed to load schema: ${e.message || e}`);
     }
@@ -131,16 +123,27 @@ export function activate(context: vscode.ExtensionContext) {
   const { SchemaRegistryClient } = await import('./clients/schemaRegistryClient');
   const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
     try {
-      // fetch all versions so paste can recreate them
-      const versions = await client.getVersions(subject);
-      if (!versions || versions.length === 0) return vscode.window.showErrorMessage('No versions found');
+      // If node specifies a single version, only copy that version. Otherwise copy all versions of the subject.
       const all: Array<{ version: number; schema: any }> = [];
-      for (const v of versions) {
+      if (node.version) {
+        const v = node.version;
         try {
           const schema = await client.getSchema(subject, v);
           all.push({ version: v, schema });
         } catch (err:any) {
           getOutputChannel().appendLine(`[copy] failed to fetch ${subject} v${v}: ${err.message || err}`);
+        }
+      } else {
+        // fetch all versions so paste can recreate them
+        const versions = await client.getVersions(subject);
+        if (!versions || versions.length === 0) return vscode.window.showErrorMessage('No versions found');
+        for (const v of versions) {
+          try {
+            const schema = await client.getSchema(subject, v);
+            all.push({ version: v, schema });
+          } catch (err:any) {
+            getOutputChannel().appendLine(`[copy] failed to fetch ${subject} v${v}: ${err.message || err}`);
+          }
         }
       }
       if (all.length === 0) return vscode.window.showErrorMessage('Failed to fetch any versions for subject');
@@ -148,6 +151,110 @@ export function activate(context: vscode.ExtensionContext) {
       const latest = all[all.length - 1].version;
       vscode.window.showInformationMessage(`Copied schema ${subject} (${all.length} versions, latest v${latest})`);
     } catch (e:any) { vscode.window.showErrorMessage(`Failed to copy schema: ${e.message || e}`); }
+  }));
+
+  context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.copySchemaVersion', async (node: any) => {
+    if (!node || !node.meta || !node.subject || !node.version) return vscode.window.showErrorMessage('Schema version node missing');
+    const meta = node.meta as any;
+    const subject = node.subject as string;
+    const version = node.version;
+    const secret = await store.getSecret(meta.id);
+    const headers: Record<string,string> = {};
+    if (meta.authType === 'basic' && meta.username && secret) headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
+    else if (meta.authType === 'bearer' && secret) headers['Authorization'] = `Bearer ${secret}`;
+    const { SchemaRegistryClient } = await import('./clients/schemaRegistryClient');
+    const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
+    try {
+      const schema = await client.getSchema(subject, version);
+      (global as any).connectAdminSchemaClipboard = { subject, versions: [{ version, schema }] };
+      vscode.window.showInformationMessage(`Copied schema ${subject} v${version}`);
+    } catch (e:any) { vscode.window.showErrorMessage(`Failed to copy schema version: ${e.message || e}`); }
+  }));
+
+  // Delete commands
+  context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.deleteSchemaSubject', async (node: any) => {
+    if (!node || !node.meta || !node.subject) return vscode.window.showErrorMessage('Schema subject node missing');
+    const meta = node.meta as any;
+    const subject = node.subject as string;
+    
+    const confirmed = await vscode.window.showWarningMessage(
+      `Delete subject "${subject}" and all its versions? This action cannot be undone.`,
+      { modal: true },
+      'Delete Subject'
+    );
+    if (confirmed !== 'Delete Subject') return;
+
+    const secret = await store.getSecret(meta.id);
+    const headers: Record<string,string> = {};
+    if (meta.authType === 'basic' && meta.username && secret) headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
+    else if (meta.authType === 'bearer' && secret) headers['Authorization'] = `Bearer ${secret}`;
+    
+    try {
+      const { SchemaRegistryClient } = await import('./clients/schemaRegistryClient');
+      const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
+      await client.deleteSubject(subject);
+      vscode.window.showInformationMessage(`Deleted subject ${subject}`);
+      treeProvider.refresh();
+    } catch (e: any) {
+      vscode.window.showErrorMessage(`Failed to delete subject: ${e.message || e}`);
+    }
+  }));
+
+  context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.deleteSchemaVersion', async (node: any) => {
+    if (!node || !node.meta || !node.subject || !node.version) return vscode.window.showErrorMessage('Schema version node missing');
+    const meta = node.meta as any;
+    const subject = node.subject as string;
+    const version = node.version;
+    
+    const confirmed = await vscode.window.showWarningMessage(
+      `Delete version ${version} of subject "${subject}"? This action cannot be undone.`,
+      { modal: true },
+      'Delete Version'
+    );
+    if (confirmed !== 'Delete Version') return;
+
+    const secret = await store.getSecret(meta.id);
+    const headers: Record<string,string> = {};
+    if (meta.authType === 'basic' && meta.username && secret) headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
+    else if (meta.authType === 'bearer' && secret) headers['Authorization'] = `Bearer ${secret}`;
+    
+    try {
+      const { SchemaRegistryClient } = await import('./clients/schemaRegistryClient');
+      const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
+      await client.deleteSchemaVersion(subject, version);
+      vscode.window.showInformationMessage(`Deleted ${subject} v${version}`);
+      treeProvider.refresh();
+    } catch (e: any) {
+      vscode.window.showErrorMessage(`Failed to delete schema version: ${e.message || e}`);
+    }
+  }));
+
+  context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.deleteConnector', async (node: any) => {
+    if (!node || !node.meta || !node.name) return vscode.window.showErrorMessage('Connector node missing');
+    const meta = node.meta as any;
+    const connectorName = node.name as string;
+    
+    const confirmed = await vscode.window.showWarningMessage(
+      `Delete connector "${connectorName}"? This action cannot be undone.`,
+      { modal: true },
+      'Delete Connector'
+    );
+    if (confirmed !== 'Delete Connector') return;
+
+    const secret = await store.getSecret(meta.id);
+    const headers: Record<string,string> = {};
+    if (meta.authType === 'basic' && meta.username && secret) headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
+    else if (meta.authType === 'bearer' && secret) headers['Authorization'] = `Bearer ${secret}`;
+    
+    try {
+      const { ConnectClient } = await import('./clients/connectClient');
+      const client = new ConnectClient({ baseUrl: meta.url, headers });
+      await client.deleteConnector(connectorName);
+      vscode.window.showInformationMessage(`Deleted connector ${connectorName}`);
+      treeProvider.refresh();
+    } catch (e: any) {
+      vscode.window.showErrorMessage(`Failed to delete connector: ${e.message || e}`);
+    }
   }));
 
   context.subscriptions.push(store);
@@ -183,17 +290,21 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.testConnection', async (node?: any) => {
     if (!node || !node.meta) return vscode.window.showErrorMessage('Connection missing');
     const meta = node.meta as any;
+    const secret = await store.getSecret(meta.id);
+    const headers: Record<string,string> = {};
+    if (meta.authType === 'basic' && meta.username && secret) headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
+    else if (meta.authType === 'bearer' && secret) headers['Authorization'] = `Bearer ${secret}`;
     try {
       if (meta.type === 'schema-registry') {
         const { SchemaRegistryClient } = await import('./clients/schemaRegistryClient');
-        const client = new SchemaRegistryClient({ baseUrl: meta.url });
+        const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
         await client.listSubjects();
       } else {
         const { ConnectClient } = await import('./clients/connectClient');
-        const client = new ConnectClient({ baseUrl: meta.url });
+        const client = new ConnectClient({ baseUrl: meta.url, headers });
         await client.listConnectors();
       }
-      vscode.window.showInformationMessage('Test OK');
+      vscode.window.showInformationMessage(`Connection test successful for ${meta.name}`);
     } catch (e:any) { vscode.window.showErrorMessage(`Test failed: ${e.message || e}`); }
   }));
 
@@ -216,7 +327,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.connector.showOffsets', async (node?: any) => {
     if (!node) return vscode.window.showErrorMessage('Connector node missing');
     const meta = node.meta as any; const name = node.name as string;
-    try { await connectorView.open(meta, name); } catch (e:any) { vscode.window.showErrorMessage(`Open connector failed: ${e.message||e}`); }
+    try { await connectorView.open(meta, name, store); } catch (e:any) { vscode.window.showErrorMessage(`Open connector failed: ${e.message||e}`); }
   }));
 
   context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.pasteSchema', async (node: any) => {
@@ -225,8 +336,9 @@ export function activate(context: vscode.ExtensionContext) {
     const defaultSubject = node.subject as string;
     const clipboard = (global as any).connectAdminSchemaClipboard;
     if (!clipboard) return vscode.window.showErrorMessage('No schema copied');
-    const target = await vscode.window.showInputBox({ prompt: 'Target subject name', value: defaultSubject });
-    if (!target) return;
+    
+    // Use the target subject directly without prompting when pasting to a subject node
+    const target = defaultSubject;
     const secret = await store.getSecret(meta.id);
     const headers: Record<string,string> = {};
     if (meta.authType === 'basic' && meta.username && secret) headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
@@ -237,7 +349,6 @@ export function activate(context: vscode.ExtensionContext) {
   let diagSchemaStr: string | undefined = undefined;
   if (clipboard.versions && Array.isArray(clipboard.versions)) {
       try {
-  let diagSchemaStr: string | undefined = undefined;
   for (const v of clipboard.versions) {
           // try to extract schema string and type from clipboard
           const payloadSchema = v.schema;
@@ -326,6 +437,8 @@ export function activate(context: vscode.ExtensionContext) {
           }
           treeProvider.refresh();
         }
+        // We've handled the multi-version paste flow; don't fall through to the single-schema fallback.
+        return;
     }
     // fallback: single-schema payloads
     let schemaStr = extractSchemaString(clipboard.schema ?? clipboard);
@@ -371,46 +484,121 @@ export function activate(context: vscode.ExtensionContext) {
     else if (meta.authType === 'bearer' && secret) headers['Authorization'] = `Bearer ${secret}`;
   const { SchemaRegistryClient } = await import('./clients/schemaRegistryClient');
   const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
-  let schemaStr = extractSchemaString(clipboard.schema ?? clipboard);
-    let schemaType: string | undefined = (clipboard.schema && (clipboard.schema as any).schemaType) || (clipboard.schema && (clipboard.schema as any).type) || undefined;
-    if (!schemaStr) return vscode.window.showErrorMessage('Copied schema payload not understood');
-    if (typeof schemaStr !== 'string') schemaStr = JSON.stringify(schemaStr);
-      try {
-        const payload: any = { schema: schemaStr };
-        if (schemaType) payload.schemaType = schemaType;
-        const regRes: any = await client.registerSchema(target, payload);
-        getOutputChannel().appendLine(`[paste] single-register returned id=${regRes && regRes.id ? regRes.id : 'unknown'}`);
-        if (regRes && typeof regRes.id === 'number') {
+  // Support multi-version clipboard payloads (replay) similar to paste on subject
+  if (clipboard.versions && Array.isArray(clipboard.versions)) {
+    let diagSchemaStr: string | undefined = undefined;
+    try {
+      for (const v of clipboard.versions) {
+        const payloadSchema = v.schema;
+        let schemaStr = extractSchemaString(payloadSchema ?? payloadSchema);
+        let schemaType: string | undefined = (payloadSchema && (payloadSchema as any).schemaType) || (payloadSchema && (payloadSchema as any).type) || undefined;
+        if (!schemaStr) {
+          getOutputChannel().appendLine(`[paste] skipping version ${v.version} for ${target}: schema payload not understood`);
+          continue;
+        }
+        if (typeof schemaStr !== 'string') schemaStr = JSON.stringify(schemaStr);
+        if (!diagSchemaStr) diagSchemaStr = schemaStr;
+        let registered = false;
+        for (let attempt = 1; attempt <= 3 && !registered; attempt++) {
           try {
-            const byId = await client.getSchemaById(regRes.id);
-            getOutputChannel().appendLine(`[paste] fetched by id ${regRes.id}: ${JSON.stringify(byId).slice(0,1000)}`);
-          } catch (byIdErr:any) {
-            getOutputChannel().appendLine(`[paste] getSchemaById ${regRes.id} failed: ${byIdErr && byIdErr.message ? byIdErr.message : String(byIdErr)}`);
-            throw new Error(`Registry returned id ${regRes.id} but /schemas/ids/${regRes.id} is not available`);
-          }
-        }
-        // authoritative verification
-        try {
-          const verifyResult = await verifySubjectRegistered(client, target);
-          if (verifyResult.ok) {
-            const verCount = Array.isArray((verifyResult as any).versions)
-              ? (verifyResult as any).versions.length
-              : (Array.isArray((verifyResult as any).subjects) ? (verifyResult as any).subjects.length : 0);
-            vscode.window.showInformationMessage(`Pasted schema to ${target} (versions: ${verCount})`);
-            treeProvider.refresh();
-          } else {
+            const payload: any = { schema: schemaStr };
+            if (schemaType) payload.schemaType = schemaType;
+            const regRes: any = await client.registerSchema(target, payload);
+            registered = true;
+            getOutputChannel().appendLine(`[paste] registered ${target} v${v.version} (attempt ${attempt}) -> id=${regRes && regRes.id ? regRes.id : 'unknown'}`);
+            if (regRes && typeof regRes.id === 'number') {
+              try {
+                const byId = await client.getSchemaById(regRes.id);
+                getOutputChannel().appendLine(`[paste] fetched by id ${regRes.id}: ${JSON.stringify(byId).slice(0,1000)}`);
+              } catch (byIdErr:any) {
+                getOutputChannel().appendLine(`[paste] getSchemaById ${regRes.id} failed: ${byIdErr && byIdErr.message ? byIdErr.message : String(byIdErr)}`);
+                throw new Error(`Registry returned id ${regRes.id} but /schemas/ids/${regRes.id} is not available`);
+              }
+            }
+          } catch (ve:any) {
             vscode.window.showWarningMessage(`Schema registered but verification for ${target} failed`);
+            try {
+              if (diagSchemaStr) {
+                const diag = await findSubjectBySchema(client, diagSchemaStr);
+                if (diag && diag.subject) {
+                  getOutputChannel().appendLine(`[diag] schema appears under subject='${diag.subject}' v${diag.version}`);
+                  vscode.window.showWarningMessage(`Schema may exist under subject ${diag.subject} v${diag.version}`);
+                }
+              }
+            } catch (dErr:any) {
+              getOutputChannel().appendLine(`[diag] findSubjectBySchema failed: ${dErr && dErr.message ? dErr.message : String(dErr)}`);
+            }
             treeProvider.refresh();
           }
-        } catch (ve:any) {
-          vscode.window.showWarningMessage(`Schema registered but verification attempt for ${target} failed: ${ve.message || ve}`);
-          treeProvider.refresh();
         }
-      } catch (e:any) {
-        vscode.window.showErrorMessage(`Failed to paste schema: ${e.message || e}`);
       }
+      try {
+        const tv = await client.getVersions(target);
+        getOutputChannel().appendLine(`[verify] target versions for ${target}: ${JSON.stringify(tv)}`);
+        vscode.window.showInformationMessage(`Pasted schema to ${target} (versions: ${tv ? tv.length : 0})`);
+        treeProvider.refresh();
+      } catch (ve:any) {
+        getOutputChannel().appendLine(`[verify] failed to fetch target versions: ${ve.message || ve}`);
+        vscode.window.showInformationMessage(`Pasted schema to ${target}`);
+        try {
+          if (diagSchemaStr) {
+            const diag = await findSubjectBySchema(client, diagSchemaStr);
+            if (diag && diag.subject) {
+              getOutputChannel().appendLine(`[diag] schema appears under subject='${diag.subject}' v${diag.version}`);
+              vscode.window.showWarningMessage(`Schema may exist under subject ${diag.subject} v${diag.version}`);
+            }
+          }
+        } catch (dErr:any) {
+          getOutputChannel().appendLine(`[diag] findSubjectBySchema failed: ${dErr && dErr.message ? dErr.message : String(dErr)}`);
+        }
+        treeProvider.refresh();
+      }
+    } catch (ve:any) {
+      vscode.window.showWarningMessage(`Schema registered but verification for ${target} failed`);
+      try {
+        if (diagSchemaStr) {
+          const diag = await findSubjectBySchema(client, diagSchemaStr);
+          if (diag && diag.subject) {
+            getOutputChannel().appendLine(`[diag] schema appears under subject='${diag.subject}' v${diag.version}`);
+            vscode.window.showWarningMessage(`Schema may exist under subject ${diag.subject} v${diag.version}`);
+          }
+        }
+      } catch (dErr:any) {
+        getOutputChannel().appendLine(`[diag] findSubjectBySchema failed: ${dErr && dErr.message ? dErr.message : String(dErr)}`);
+      }
+      treeProvider.refresh();
+    }
+    return;
+  }
+
+  // single-schema fallback continues below
+  let schemaStr = extractSchemaString(clipboard.schema ?? clipboard);
+  let schemaType: string | undefined = (clipboard.schema && (clipboard.schema as any).schemaType) || (clipboard.schema && (clipboard.schema as any).type) || undefined;
+  if (!schemaStr) return vscode.window.showErrorMessage('Copied schema payload not understood');
+  if (typeof schemaStr !== 'string') schemaStr = JSON.stringify(schemaStr);
+  try {
+    const payload: any = { schema: schemaStr };
+    if (schemaType) payload.schemaType = schemaType;
+    await client.registerSchema(target, payload);
+    // verify with a few retries
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const tv = await client.getVersions(target);
+        if (tv && tv.length > 0) {
+          getOutputChannel().appendLine(`[verify] target versions for ${target}: ${JSON.stringify(tv)}`);
+          vscode.window.showInformationMessage(`Pasted schema to ${target} (versions: ${tv.length})`);
+          treeProvider.refresh();
+          return;
+        }
+      } catch (ve:any) {
+        getOutputChannel().appendLine(`[verify] attempt ${attempt} failed: ${ve.message || ve}`);
+      }
+      await new Promise(r => setTimeout(r, 400 * attempt));
+    }
+    vscode.window.showWarningMessage(`Schema registered but target reports no versions for ${target}`);
+    treeProvider.refresh();
+  } catch (e:any) { vscode.window.showErrorMessage(`Failed to paste schema: ${e.message || e}`); }
   }));
-}
 
 async function verifySubjectRegistered(client: any, subject: string, expectedMinVersions = 1, attempts = 6, initialDelayMs = 200) {
   const oc = getOutputChannel();
@@ -452,6 +640,8 @@ async function verifySubjectRegistered(client: any, subject: string, expectedMin
 }
 
 // Diagnostic helper: search all subjects to find one whose any-version schema equals the provided schema string
+}
+
 async function findSubjectBySchema(client: any, schemaStr: string, maxSubjects = 100) {
   const oc = getOutputChannel();
   try {

@@ -171,4 +171,19 @@ export class ConnectClient {
     oc.appendLine(`[http] restartConnector success ${res.status}`);
     try { const j = await res.json(); oc.appendLine(`[http] restartConnector body: ${JSON.stringify(j)}`); return j; } catch { return undefined; }
   }
+
+  // delete a connector
+  async deleteConnector(name: string): Promise<void> {
+    const url = `${this.baseUrl}/connectors/${encodeURIComponent(name)}`;
+    const oc = getOutputChannel();
+    oc.appendLine(`[http] deleteConnector: DELETE ${url}`);
+    const res = await fetch(url, { method: 'DELETE', headers: this.headers });
+    if (!res.ok && res.status !== 404) {
+      let txt = '';
+      try { txt = await res.text(); } catch {}
+      oc.appendLine(`[http] deleteConnector failed ${res.status} ${txt}`);
+      throw new Error(`Delete connector failed: ${res.status} ${txt}`);
+    }
+    oc.appendLine(`[http] deleteConnector success ${res.status}`);
+  }
 }

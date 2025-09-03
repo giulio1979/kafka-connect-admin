@@ -12,3 +12,4 @@
 - you document architecture of the project
 - you write tests for code and ensure high test coverage
 - you write testable code
+- i am using VSCODE in windows 11 and I run docker containers in WSL

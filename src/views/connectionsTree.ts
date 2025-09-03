@@ -23,19 +23,52 @@ class ConnectorNode extends vscode.TreeItem {
 
 export class ConnectionsTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private store?: ConnectionStore;
+  private context?: vscode.ExtensionContext;
   private _onDidChangeTreeData: any = new (vscode as any).EventEmitter();
   readonly onDidChangeTreeData: any = this._onDidChangeTreeData.event;
 
   constructor(context?: vscode.ExtensionContext) {
-    if (context) this.store = new ConnectionStore(context);
+    if (context) {
+      this.store = new ConnectionStore(context);
+      this.context = context;
+    }
   }
 
   setContext(context: vscode.ExtensionContext) {
     if (!this.store) this.store = new ConnectionStore(context);
+    this.context = context;
   }
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
+  }
+
+  // Save tree state to workspace state
+  private saveTreeState(nodeId: string, isExpanded: boolean): void {
+    if (!this.context) return;
+    const key = 'connectAdmin.treeState';
+    const currentState = (this.context as any).workspaceState.get(key, {}) as Record<string, boolean>;
+    currentState[nodeId] = isExpanded;
+    (this.context as any).workspaceState.update(key, currentState);
+  }
+
+  // Get tree state from workspace state
+  private getTreeState(nodeId: string): boolean | undefined {
+    if (!this.context) return undefined;
+    const key = 'connectAdmin.treeState';
+    const currentState = (this.context as any).workspaceState.get(key, {}) as Record<string, boolean>;
+    return currentState[nodeId];
+  }
+
+  // Generate unique ID for tree nodes
+  private getNodeId(element: any): string {
+    if (element.isConnection) {
+      return `connection:${element.meta.id}`;
+    }
+    if (element.contextValue === 'schemaSubject') {
+      return `subject:${element.meta.id}:${element.subject}`;
+    }
+    return `unknown:${element.label || 'unnamed'}`;
   }
 
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {

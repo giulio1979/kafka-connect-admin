@@ -8,7 +8,7 @@ export class ConnectorView {
   private panel?: any;
   constructor(private context: vscode.ExtensionContext) {}
 
-  public async open(connMeta: ConnectionMeta, connectorName: string) {
+  public async open(connMeta: ConnectionMeta, connectorName: string, store: any) {
     const id = `connector-${connMeta.id}-${connectorName}`.replace(/[^a-z0-9\-]/gi, '-');
     if (this.panel) {
       this.panel.reveal();
@@ -22,7 +22,7 @@ export class ConnectorView {
       this.panel.onDidDispose(() => { this.panel = undefined; });
     }
 
-    const secret = await this.context.secrets.get(`connectAdmin.secret.${connMeta.id}`);
+    const secret = await store.getSecret(connMeta.id);
     const headers: Record<string,string> = {};
     if (connMeta.authType === 'basic' && connMeta.username && secret) {
       headers['Authorization'] = 'Basic ' + Buffer.from(connMeta.username + ':' + secret).toString('base64');
@@ -107,131 +107,467 @@ export class ConnectorView {
       .replace(/\u2029/g, '\\u2029')
       .replace(/`/g, '&#96;');
 
-    return `<!doctype html>
-    <html>
-    <head>
-    <meta charset="utf-8" />
+    // Determine connector state and colors
+    const connectorState = typeof status === 'object' && status && status.connector && status.connector.state ? status.connector.state : 'UNKNOWN';
+    let stateColor = 'var(--vscode-button-secondaryBackground)';
+    let stateTextColor = 'var(--vscode-button-secondaryForeground)';
+    
+    switch (connectorState) {
+      case 'RUNNING':
+        stateColor = 'var(--vscode-testing-iconPassed)';
+        stateTextColor = 'white';
+        break;
+      case 'FAILED':
+      case 'DESTROYED':
+        stateColor = 'var(--vscode-testing-iconFailed)';
+        stateTextColor = 'white';
+        break;
+      case 'PAUSED':
+        stateColor = 'var(--vscode-notificationsWarningIcon-foreground)';
+        stateTextColor = 'white';
+        break;
+    }
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+    <title>Connector: ${name}</title>
     <style>
-      body{font-family:Segoe UI,Arial;margin:12px}
-      .btn-group { margin-bottom: 16px; }
-      button { padding: 6px 16px; margin-right: 8px; border-radius: 4px; border: 1px solid #ccc; background: #f6f8fa; cursor: pointer; font-size: 15px; }
-      button#stop { background: #ffeaea; border-color: #e57373; color: #c62828; }
-      button#pause { background: #fffbe6; border-color: #ffd54f; color: #f9a825; }
-      button#resume { background: #e8f5e9; border-color: #81c784; color: #388e3c; }
-      button#restart { background: #e3f2fd; border-color: #64b5f6; color: #1976d2; }
-      button#saveOffsets { background: #e0f7fa; border-color: #4dd0e1; color: #00838f; }
-      button#editOffsets { background: #fffde7; border-color: #ffd54f; color: #fbc02d; }
-      button:active { filter: brightness(0.95); }
-      textarea { width: 100%; font-family: monospace; font-size: 15px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; margin-top: 8px; margin-bottom: 8px; }
-      #statusArea { height: 120px; resize: vertical; background: #f6f8fa; }
-      #offsetsEditor { height: 180px; resize: vertical; }
+      body { 
+        font-family: 'Segoe UI', Arial, sans-serif; 
+        margin: 16px; 
+        background-color: var(--vscode-editor-background); 
+        color: var(--vscode-editor-foreground); 
+        line-height: 1.4;
+      }
+      
+      .header { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        margin-bottom: 24px; 
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--vscode-panel-border);
+      }
+      
+      .header h1 { 
+        margin: 0; 
+        color: var(--vscode-foreground); 
+        font-size: 24px; 
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .status-badge {
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        background: ${stateColor};
+        color: ${stateTextColor};
+      }
+      
+      .toolbar { 
+        display: flex; 
+        gap: 8px; 
+        flex-wrap: wrap;
+      }
+      
+      .btn { 
+        padding: 8px 16px; 
+        border: 1px solid var(--vscode-button-border); 
+        background: var(--vscode-button-background); 
+        color: var(--vscode-button-foreground); 
+        border-radius: 4px; 
+        cursor: pointer; 
+        font-size: 13px; 
+        font-weight: 500;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      
+      .btn:hover { 
+        background: var(--vscode-button-hoverBackground); 
+        transform: translateY(-1px);
+      }
+      
+      .btn:active { 
+        transform: translateY(0);
+      }
+      
+      .btn:disabled { 
+        opacity: 0.6; 
+        cursor: not-allowed; 
+        transform: none !important;
+      }
+      
+      .btn.danger { 
+        background: var(--vscode-testing-iconFailed); 
+        color: white; 
+        border-color: var(--vscode-testing-iconFailed);
+      }
+      
+      .btn.warning { 
+        background: var(--vscode-notificationsWarningIcon-foreground); 
+        color: white; 
+        border-color: var(--vscode-notificationsWarningIcon-foreground);
+      }
+      
+      .btn.success { 
+        background: var(--vscode-testing-iconPassed); 
+        color: white; 
+        border-color: var(--vscode-testing-iconPassed);
+      }
+      
+      .btn.primary { 
+        background: var(--vscode-button-background); 
+        color: var(--vscode-button-foreground); 
+        border-color: var(--vscode-button-border);
+      }
+      
+      .btn.secondary { 
+        background: var(--vscode-button-secondaryBackground); 
+        color: var(--vscode-button-secondaryForeground);
+        border-color: var(--vscode-button-border);
+      }
+      
+      .error-banner { 
+        margin-bottom: 16px; 
+        padding: 12px; 
+        border-radius: 6px; 
+        background: var(--vscode-inputValidation-errorBackground); 
+        border: 1px solid var(--vscode-inputValidation-errorBorder); 
+        color: var(--vscode-inputValidation-errorForeground);
+        display: none;
+        animation: slideDown 0.2s ease-out;
+      }
+      
+      .error-banner.show { 
+        display: block; 
+      }
+      
+      @keyframes slideDown { 
+        from { opacity: 0; transform: translateY(-10px); } 
+        to { opacity: 1; transform: translateY(0); } 
+      }
+      
+      .section { 
+        margin-bottom: 24px; 
+        padding: 16px; 
+        border: 1px solid var(--vscode-panel-border); 
+        border-radius: 6px; 
+        background: var(--vscode-editor-background);
+      }
+      
+      .section-header { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        margin-bottom: 16px; 
+      }
+      
+      .section-title { 
+        margin: 0; 
+        font-size: 16px; 
+        font-weight: 600; 
+        color: var(--vscode-foreground);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .section-actions { 
+        display: flex; 
+        gap: 8px; 
+      }
+      
+      .code-block { 
+        background: var(--vscode-textCodeBlock-background); 
+        border: 1px solid var(--vscode-panel-border); 
+        border-radius: 4px; 
+        font-family: 'Fira Code', 'Consolas', 'Courier New', monospace; 
+        font-size: 13px; 
+        line-height: 1.4;
+        overflow: auto;
+        max-height: 400px;
+      }
+      
+      .code-block textarea { 
+        width: 100%; 
+        min-height: 200px; 
+        padding: 12px; 
+        border: none; 
+        background: transparent; 
+        color: var(--vscode-editor-foreground); 
+        font-family: inherit; 
+        font-size: inherit; 
+        line-height: inherit;
+        resize: vertical;
+        outline: none;
+      }
+      
+      .code-block textarea:focus { 
+        background: var(--vscode-input-background); 
+      }
+      
+      .code-block pre { 
+        margin: 0; 
+        padding: 12px; 
+        white-space: pre-wrap; 
+        word-wrap: break-word;
+      }
+      
+      .details-section { 
+        margin-top: 8px;
+      }
+      
+      .details-summary { 
+        font-weight: 600; 
+        cursor: pointer; 
+        padding: 8px 0; 
+        color: var(--vscode-foreground);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .details-summary:hover { 
+        color: var(--vscode-button-background); 
+      }
+      
+      .auto-refresh-info {
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
+        margin-top: 8px;
+      }
+      
+      .connection-info {
+        background: var(--vscode-editor-inactiveSelectionBackground);
+        border-left: 4px solid var(--vscode-button-background);
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 24px;
+        font-size: 13px;
+      }
+      
+      .connection-info strong {
+        color: var(--vscode-foreground);
+      }
     </style>
-    </head>
-    <body>
-    <h2>${name}</h2>
-    <div class="btn-group">
-      <button id="stop">Stop</button>
-      <button id="pause">Pause</button>
-      <button id="resume">Resume</button>
-      <button id="restart">Restart</button>
-      <button id="refresh">Refresh</button>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <span>🔗</span>
+            ${name}
+            <span class="status-badge" id="statusBadge">${connectorState}</span>
+        </h1>
+        <div class="toolbar">
+            <button id="refresh" class="btn secondary">🔄 Refresh</button>
+            <button id="pause" class="btn warning">⏸️ Pause</button>
+            <button id="resume" class="btn success">▶️ Resume</button>
+            <button id="restart" class="btn primary">🔄 Restart</button>
+            <button id="stop" class="btn danger">⏹️ Stop</button>
+        </div>
     </div>
-    <div id="errorMsg" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:4px;background:#ffebee;color:#c62828;font-weight:bold;"></div>
-    <div id="connState" style="margin-bottom:12px;font-size:16px;font-weight:bold;padding:6px 12px;border-radius:4px;background:#e3f2fd;color:#1976d2;display:inline-block;">
-      State: ${typeof status === 'object' && status && status.connector && status.connector.state ? status.connector.state : 'unknown'}
+    
+    <div class="connection-info">
+        <strong>Connection:</strong> ${connMeta.name} (${connMeta.url})
     </div>
-    <details style="margin-bottom:12px;">
-      <summary style="font-weight:bold;cursor:pointer;">Detailed Connector Status (JSON)</summary>
-      <textarea id="detailedStatusArea" readonly style="width:100%;height:180px;resize:vertical;">${safe(status)}</textarea>
-    </details>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-    <h3 style="margin:0;">Offsets</h3>
-    <button id="editOffsets">Edit</button>
-    <button id="saveOffsets" style="display:none">Save</button>
-  </div>
-  <textarea id="offsetsEditor" readonly>${safe(offsets)}</textarea>
+    
+    <div id="errorBanner" class="error-banner">
+        <strong>Error:</strong> <span id="errorMessage"></span>
+    </div>
+    
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">📊 Connector Status</h2>
+        </div>
+        <div class="details-section">
+            <details>
+                <summary class="details-summary">📋 View Detailed Status (JSON)</summary>
+                <div class="code-block">
+                    <pre id="detailedStatus">${safe(status)}</pre>
+                </div>
+            </details>
+        </div>
+        <div class="auto-refresh-info">
+            ℹ️ Status automatically refreshes every 15 seconds
+        </div>
+    </div>
+    
+    <div class="section">
+        <div class="section-header">
+            <h2 class="section-title">⚡ Consumer Offsets</h2>
+            <div class="section-actions">
+                <button id="editOffsets" class="btn secondary">✏️ Edit</button>
+                <button id="saveOffsets" class="btn primary" style="display: none;">💾 Save</button>
+            </div>
+        </div>
+        <div class="code-block">
+            <textarea id="offsetsEditor" readonly placeholder="Loading offsets...">${safe(offsets)}</textarea>
+        </div>
+    </div>
 
     <script>
     (function(){
       const vscode = (typeof acquireVsCodeApi === 'function') ? acquireVsCodeApi() : null;
       function safePost(msg){ if (vscode && typeof vscode.postMessage === 'function') try{ vscode.postMessage(msg); }catch(e){} }
+      
+      // UI elements
+      const errorBanner = document.getElementById('errorBanner');
+      const errorMessage = document.getElementById('errorMessage');
+      const statusBadge = document.getElementById('statusBadge');
+      const detailedStatus = document.getElementById('detailedStatus');
+      const offsetsEditor = document.getElementById('offsetsEditor');
+      const editOffsetsBtn = document.getElementById('editOffsets');
+      const saveOffsetsBtn = document.getElementById('saveOffsets');
+      
+      // Utility functions
+      function showError(message) {
+        if (errorMessage && errorBanner) {
+          errorMessage.textContent = message;
+          errorBanner.className = 'error-banner show';
+        }
+      }
+      
+      function hideError() {
+        if (errorBanner) {
+          errorBanner.className = 'error-banner';
+        }
+      }
+      
+      function updateStatusBadge(state) {
+        if (!statusBadge) return;
+        statusBadge.textContent = state || 'UNKNOWN';
+        
+        // Update badge colors
+        statusBadge.style.background = 'var(--vscode-button-secondaryBackground)';
+        statusBadge.style.color = 'var(--vscode-button-secondaryForeground)';
+        
+        switch (state) {
+          case 'RUNNING':
+            statusBadge.style.background = 'var(--vscode-testing-iconPassed)';
+            statusBadge.style.color = 'white';
+            break;
+          case 'FAILED':
+          case 'DESTROYED':
+            statusBadge.style.background = 'var(--vscode-testing-iconFailed)';
+            statusBadge.style.color = 'white';
+            break;
+          case 'PAUSED':
+            statusBadge.style.background = 'var(--vscode-notificationsWarningIcon-foreground)';
+            statusBadge.style.color = 'white';
+            break;
+        }
+      }
+      
+      function setButtonLoading(button, loading) {
+        if (!button) return;
+        button.disabled = loading;
+        if (loading) {
+          button.style.opacity = '0.6';
+        } else {
+          button.style.opacity = '1';
+        }
+      }
+      
+      // Event listeners
       document.addEventListener('DOMContentLoaded', function(){
         // Auto-refresh status every 15 seconds
         setInterval(() => {
           safePost({ cmd: 'refresh' });
         }, 15000);
-        const pause = document.getElementById('pause');
-        const resume = document.getElementById('resume');
-        const refresh = document.getElementById('refresh');
-        const stopBtn = document.getElementById('stop');
-        const restartBtn = document.getElementById('restart');
-        const saveOffsetsBtn = document.getElementById('saveOffsets');
-        const editOffsetsBtn = document.getElementById('editOffsets');
-        const offsetsEditor = document.getElementById('offsetsEditor');
-        function clearError() {
-          const errorDiv = document.getElementById('errorMsg');
-          if (errorDiv) errorDiv.style.display = 'none';
-        }
-        if (pause) pause.addEventListener('click', () => { clearError(); safePost({ cmd: 'pause' }); });
-        if (resume) resume.addEventListener('click', () => { clearError(); safePost({ cmd: 'resume' }); });
-        if (stopBtn) stopBtn.addEventListener('click', () => { clearError(); safePost({ cmd: 'stop' }); });
-        if (restartBtn) restartBtn.addEventListener('click', () => { clearError(); safePost({ cmd: 'restart' }); });
-        if (refresh) refresh.addEventListener('click', () => { clearError(); safePost({ cmd: 'refresh' }); });
+        
+        // Action buttons
+        const buttons = ['pause', 'resume', 'stop', 'restart', 'refresh'];
+        buttons.forEach(action => {
+          const btn = document.getElementById(action);
+          if (btn) {
+            btn.addEventListener('click', () => {
+              hideError();
+              setButtonLoading(btn, true);
+              safePost({ cmd: action });
+              
+              // Re-enable button after 3 seconds to prevent hanging
+              setTimeout(() => setButtonLoading(btn, false), 3000);
+            });
+          }
+        });
+        
+        // Offsets editing
         if (editOffsetsBtn && offsetsEditor && saveOffsetsBtn) {
           editOffsetsBtn.addEventListener('click', () => {
-            clearError();
+            hideError();
             offsetsEditor.readOnly = false;
             offsetsEditor.focus();
+            offsetsEditor.style.background = 'var(--vscode-input-background)';
             editOffsetsBtn.style.display = 'none';
-            saveOffsetsBtn.style.display = '';
+            saveOffsetsBtn.style.display = 'inline-flex';
           });
-        }
-        if (saveOffsetsBtn && offsetsEditor && editOffsetsBtn) {
+          
           saveOffsetsBtn.addEventListener('click', () => {
-            clearError();
+            hideError();
+            setButtonLoading(saveOffsetsBtn, true);
             safePost({ cmd: 'patchOffsets', payload: offsetsEditor.value });
-            offsetsEditor.readOnly = true;
-            editOffsetsBtn.style.display = '';
-            saveOffsetsBtn.style.display = 'none';
           });
         }
+        
+        // Message handling
         window.addEventListener('message', event => {
           const msg = event.data;
-          // error handling
-          const errorDiv = document.getElementById('errorMsg');
+          
+          // Handle errors
           if (msg.error || (msg.cmd === 'error' && msg.message)) {
-            if (errorDiv) {
-              errorDiv.textContent = msg.error || msg.message;
-              errorDiv.style.display = '';
-            }
+            showError(msg.error || msg.message);
+            // Re-enable all buttons
+            document.querySelectorAll('button').forEach(btn => setButtonLoading(btn, false));
           } else {
-            if (errorDiv) errorDiv.style.display = 'none';
+            hideError();
           }
+          
+          // Handle updates
           if (msg.cmd === 'update') {
-            const detailedStatus = document.getElementById('detailedStatusArea');
-            const o = document.getElementById('offsetsEditor');
-            if (detailedStatus) detailedStatus.value = JSON.stringify(msg.status, null, 2);
-            if (o) o.value = JSON.stringify(msg.offsets, null, 2);
-            if (o) o.readOnly = true;
-            const editBtn = document.getElementById('editOffsets');
-            const saveBtn = document.getElementById('saveOffsets');
-            if (editBtn) editBtn.style.display = '';
-            if (saveBtn) saveBtn.style.display = 'none';
-            // update connector state field
-            const connStateDiv = document.getElementById('connState');
-            let state = 'unknown';
+            if (detailedStatus) {
+              detailedStatus.textContent = JSON.stringify(msg.status, null, 2);
+            }
+            
+            if (offsetsEditor) {
+              offsetsEditor.value = JSON.stringify(msg.offsets, null, 2);
+              offsetsEditor.readOnly = true;
+              offsetsEditor.style.background = 'transparent';
+            }
+            
+            if (editOffsetsBtn) editOffsetsBtn.style.display = 'inline-flex';
+            if (saveOffsetsBtn) saveOffsetsBtn.style.display = 'none';
+            
+            // Update status badge
+            let state = 'UNKNOWN';
             try {
-              const st = msg.status;
-              if (st && st.connector && st.connector.state) state = st.connector.state;
-            } catch {}
-            if (connStateDiv) connStateDiv.textContent = 'State: ' + state;
+              if (msg.status && msg.status.connector && msg.status.connector.state) {
+                state = msg.status.connector.state;
+              }
+            } catch (e) {}
+            updateStatusBadge(state);
+            
+            // Re-enable all buttons
+            document.querySelectorAll('button').forEach(btn => setButtonLoading(btn, false));
           }
         });
       });
     })();
     </script>
-    </body>
-    </html>`;
+</body>
+</html>`;
   }
 }

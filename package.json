@@ -2,10 +2,15 @@
   "name": "kafka-connect-admin",
   "displayName": "Connect Admin",
   "version": "0.0.1",
-  "publisher": "Iulius Hutuleac",
+  "categories": [
+    "Data Science",
+    "Other"
+  ],
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.103.0",
+    "code-server": "^4.0.0"
   },
+  "publisher": "IuliusHutuleac",
   "main": "out/extension.js",
   "activationEvents": [
     "onCommand:connectAdmin.hello",
@@ -88,6 +93,18 @@
       {
         "command": "connectAdmin.testOfficialClient",
         "title": "Test Official Client"
+      },
+      {
+        "command": "connectAdmin.deleteSchemaSubject",
+        "title": "Delete Subject"
+      },
+      {
+        "command": "connectAdmin.deleteSchemaVersion",
+        "title": "Delete Version"
+      },
+      {
+        "command": "connectAdmin.deleteConnector",
+        "title": "Delete Connector"
       }
     ],
     "views": {
@@ -102,54 +119,74 @@
     "menus": {
       "view/item/context": [
         {
-          "when": "view == connectAdmin.connections && viewItem == connector",
-          "command": "connectAdmin.connector.pause",
-          "group": "1_modification"
-        },
-        {
-          "when": "view == connectAdmin.connections && viewItem == connector",
-          "command": "connectAdmin.connector.resume",
-          "group": "1_modification"
-        },
-        {
-          "when": "view == connectAdmin.connections && viewItem == connector",
-          "command": "connectAdmin.connector.showOffsets",
-          "group": "1_modification"
+          "when": "view == connectAdmin.connections && viewItem == connection",
+          "command": "connectAdmin.editConnection",
+          "group": "1_modify"
         },
         {
           "when": "view == connectAdmin.connections && viewItem == connection",
-          "command": "connectAdmin.editConnection",
-          "group": "1_modification"
+          "command": "connectAdmin.testConnection",
+          "group": "2_test"
         },
         {
           "when": "view == connectAdmin.connections && viewItem == connection",
           "command": "connectAdmin.removeConnection",
-          "group": "2_deletion"
-        },
-        {
-          "when": "view == connectAdmin.connections && viewItem == schemaVersion",
-          "command": "connectAdmin.copySchemaVersion",
-          "group": "1_modification"
-        },
-        {
-          "when": "view == connectAdmin.connections && viewItem == schemaSubject",
-          "command": "connectAdmin.copySchema",
-          "group": "1_modification"
-        },
-        {
-          "when": "view == connectAdmin.connections && viewItem == schemaSubject",
-          "command": "connectAdmin.pasteSchema",
-          "group": "1_modification"
+          "group": "9_delete"
         },
         {
           "when": "view == connectAdmin.connections && viewItem == connection.schemaRegistry",
           "command": "connectAdmin.pasteSchemaToConnection",
-          "group": "1_modification"
+          "group": "3_clipboard"
         },
         {
           "when": "view == connectAdmin.connections && viewItem == connection.schemaRegistry",
           "command": "connectAdmin.testOfficialClient",
           "group": "2_test"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaSubject",
+          "command": "connectAdmin.copySchema",
+          "group": "3_clipboard"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaSubject",
+          "command": "connectAdmin.pasteSchema",
+          "group": "3_clipboard"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaSubject",
+          "command": "connectAdmin.deleteSchemaSubject",
+          "group": "9_delete"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaVersion",
+          "command": "connectAdmin.copySchemaVersion",
+          "group": "3_clipboard"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == schemaVersion",
+          "command": "connectAdmin.deleteSchemaVersion",
+          "group": "9_delete"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connector",
+          "command": "connectAdmin.connector.pause",
+          "group": "1_modify"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connector",
+          "command": "connectAdmin.connector.resume",
+          "group": "1_modify"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connector",
+          "command": "connectAdmin.connector.showOffsets",
+          "group": "2_view"
+        },
+        {
+          "when": "view == connectAdmin.connections && viewItem == connector",
+          "command": "connectAdmin.deleteConnector",
+          "group": "9_delete"
         },
         {
           "when": "view == connectAdmin.connections",
@@ -169,6 +206,52 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "Connect Admin",
+      "properties": {
+        "connectAdmin.connections": {
+          "type": "array",
+          "default": [],
+          "description": "Kafka Connect and Schema Registry connections",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the connection"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name for the connection"
+              },
+              "url": {
+                "type": "string",
+                "description": "Base URL for the connection"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["connect", "schema-registry"],
+                "description": "Type of connection"
+              },
+              "authType": {
+                "type": "string",
+                "enum": ["none", "basic", "bearer"],
+                "description": "Authentication type"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username for basic authentication"
+              },
+              "password": {
+                "type": "string",
+                "description": "Password/token stored as base64. Note: Base64 is encoding, not encryption - anyone with file access can decode this."
+              }
+            },
+            "required": ["id", "name", "url", "type"]
+          }
+        }
+      }
     }
   },
   "scripts": {
