@@ -6,6 +6,11 @@
     "Data Science",
     "Other"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IuliusHutuleac/kafka-connect-admin.git"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.103.0",
     "code-server": "^4.0.0"
