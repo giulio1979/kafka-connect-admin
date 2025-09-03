@@ -1,7 +1,8 @@
 {
   "name": "kafka-connect-admin",
-  "displayName": "Connect Admin",
-  "version": "0.0.2",
+  "displayName": "Kafka Connect & Schema Admin",
+  "description": "Administer Kafka Connect and Confluent Schema Registry",
+  "version": "0.0.4",
   "categories": [
     "Data Science",
     "Other"
