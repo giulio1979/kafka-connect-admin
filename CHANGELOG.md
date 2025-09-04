@@ -13,13 +13,19 @@ The format is based on "Keep a Changelog" and this project follows semantic vers
 - Implemented per-connector panel isolation using Map-based panel management
 - Each connector now maintains its own webview panel instance with proper cleanup on disposal
 - Fixed data mixing between connector views that was causing unstable behavior in larger environments
+- **OffsetEditor**: Applied same Map-based panel management pattern to OffsetEditor for consistency
+- **Code Quality**: Removed all debug console.log statements from production code, replaced with proper logging system
 - **Tests**: Fixed failing unit tests by adding proper VS Code API mocking for Jest test environment
 
 ### Technical Details
 - Refactored `ConnectorView` class from singleton pattern to multi-instance panel management
+- Refactored `OffsetEditor` class from singleton pattern to multi-instance panel management
 - Added unique panel identification using `connector-{connectionId}-{connectorName}` pattern
 - Implemented proper memory cleanup with `onDidDispose` handlers to prevent memory leaks
 - Each connector view now has isolated auto-refresh timers and event handlers
+- Each offset editor now has isolated panel instances per connector
+- Replaced 9 production console.log statements with proper logging using VS Code output channel
+- All debug logging now goes through centralized `getOutputChannel()` system with consistent formatting
 - Added comprehensive VS Code API mock (`__mocks__/vscode.js`) supporting all required interfaces
 - Updated Jest configuration with proper setup for VS Code extension testing
 

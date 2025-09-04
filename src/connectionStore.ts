@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { getOutputChannel } from './logger';
 
 export type ConnectionType = 'connect' | 'schema-registry';
 
@@ -28,7 +29,7 @@ export class ConnectionStore implements vscode.Disposable {
     const settingsConnections = config.get(SETTINGS_KEY) as ConnectionMeta[];
     
     if (settingsConnections && settingsConnections.length > 0) {
-      console.log('listConnections from settings:', settingsConnections); // Debug log
+      getOutputChannel().appendLine(`[connectionStore] Found ${settingsConnections.length} connections in settings`);
       return settingsConnections;
     }
     
@@ -36,7 +37,7 @@ export class ConnectionStore implements vscode.Disposable {
     const raw = this.context.globalState.get<string>(CONNECTIONS_KEY, '[]');
     try {
       const connections = JSON.parse(raw) as ConnectionMeta[];
-      console.log('listConnections from internal state:', connections); // Debug log
+      getOutputChannel().appendLine(`[connectionStore] Found ${connections.length} connections in internal state (fallback)`);
       
       // If we have connections in internal state but not in settings, migrate them
       if (connections.length > 0) {
@@ -61,7 +62,7 @@ export class ConnectionStore implements vscode.Disposable {
     const config = (vscode as any).workspace.getConfiguration();
     await config.update(SETTINGS_KEY, conns, (vscode as any).ConfigurationTarget.Workspace);
     
-    console.log('Saved connections to settings.json:', conns); // Debug log
+    getOutputChannel().appendLine(`[connectionStore] Saved ${conns.length} connections to settings.json`);
   }
 
   async addConnection(conn: ConnectionMeta, secret?: string) {
@@ -70,13 +71,13 @@ export class ConnectionStore implements vscode.Disposable {
     // Save password to settings.json as base64 (Note: This is not secure - base64 is just encoding!)
     if (secret) {
       conn.password = Buffer.from(secret).toString('base64');
-      console.log('Saving password to settings.json as base64');
+      getOutputChannel().appendLine(`[connectionStore] Saving password for connection ${conn.id} to settings.json (insecure)`);
     }
     
     conns.push(conn);
-    console.log('addConnection - before save:', conns); // Debug log
+    getOutputChannel().appendLine(`[connectionStore] Adding connection ${conn.id} (${conn.name})`);
     await this.saveConnections(conns);
-    console.log('addConnection - after save:', conns); // Debug log
+    getOutputChannel().appendLine(`[connectionStore] Successfully added connection ${conn.id}`);
     
     // Also save to secure storage as backup/fallback
     if (secret) await this.setSecret(conn.id, secret);
@@ -90,7 +91,7 @@ export class ConnectionStore implements vscode.Disposable {
     // Save password to settings.json as base64 when updating
     if (secret) {
       patch.password = Buffer.from(secret).toString('base64');
-      console.log('Updating password in settings.json as base64');
+      getOutputChannel().appendLine(`[connectionStore] Updating password for connection ${id} in settings.json (insecure)`);
     }
     
     conns[idx] = { ...conns[idx], ...patch };
@@ -118,14 +119,14 @@ export class ConnectionStore implements vscode.Disposable {
     const conns = await this.listConnections();
     const conn = conns.find(c => c.id === id);
     if (conn && conn.password) {
-      console.log('Reading password from settings.json');
+      getOutputChannel().appendLine(`[connectionStore] Reading password for connection ${id} from settings.json`);
       return Buffer.from(conn.password, 'base64').toString();
     }
     
     // Fallback to secure storage for backward compatibility
     const secureSecret = await this.context.secrets.get(this.secretKey(id));
     if (secureSecret) {
-      console.log('Reading password from secure storage (fallback)');
+      getOutputChannel().appendLine(`[connectionStore] Reading password for connection ${id} from secure storage (fallback)`);
       return secureSecret;
     }
     

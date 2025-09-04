@@ -4,21 +4,26 @@ import { ConnectionMeta } from '../connectionStore';
 import { getOutputChannel } from '../logger';
 
 export class OffsetEditor {
-  private panel?: any;
+  private panels: Map<string, any> = new Map();
   constructor(private context: vscode.ExtensionContext) {}
 
   public async open(connMeta: ConnectionMeta, connectorName: string) {
     const id = `offsets-${connMeta.id}-${connectorName}`.replace(/[^a-z0-9\-]/gi, '-');
-    if (this.panel) {
-      this.panel.reveal();
+    
+    // Check if a panel already exists for this specific connector's offset editor
+    let panel = this.panels.get(id);
+    if (panel) {
+      panel.reveal();
+      return; // Don't reprocess if panel already exists and is being revealed
     } else {
-      this.panel = (vscode as any).window.createWebviewPanel(
+      panel = (vscode as any).window.createWebviewPanel(
         'offsetEditor',
         `Offsets: ${connectorName}`,
         { viewColumn: (vscode as any).ViewColumn.Active, preserveFocus: false },
         { enableScripts: true }
       );
-      this.panel.onDidDispose(() => { this.panel = undefined; });
+      this.panels.set(id, panel);
+      panel.onDidDispose(() => { this.panels.delete(id); });
     }
 
     const secret = await this.context.secrets.get(`connectAdmin.secret.${connMeta.id}`);
@@ -37,17 +42,17 @@ export class OffsetEditor {
       offsets = { error: String(e) };
     }
 
-    this.panel.webview.html = this.renderHtml(connectorName, offsets);
+    panel.webview.html = this.renderHtml(connectorName, offsets);
 
-  this.panel.webview.onDidReceiveMessage(async (msg: any) => {
+  panel.webview.onDidReceiveMessage(async (msg: any) => {
       try {
         getOutputChannel().appendLine(`[offsets webview] received ${msg.cmd} for ${connectorName}`);
   if (msg.cmd === 'validate') {
           try {
             JSON.parse(msg.payload);
-            this.panel.webview.postMessage({ cmd: 'validateResult', ok: true });
+            panel.webview.postMessage({ cmd: 'validateResult', ok: true });
           } catch (e: any) {
-            this.panel.webview.postMessage({ cmd: 'validateResult', ok: false, message: e.message || String(e) });
+            panel.webview.postMessage({ cmd: 'validateResult', ok: false, message: e.message || String(e) });
           }
   } else if (msg.cmd === 'apply') {
           // parse and send to Connect
@@ -55,24 +60,24 @@ export class OffsetEditor {
           try {
             body = JSON.parse(msg.payload);
           } catch (e: any) {
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: false, message: 'Invalid JSON: ' + (e.message || String(e)) });
+            panel.webview.postMessage({ cmd: 'applyResult', success: false, message: 'Invalid JSON: ' + (e.message || String(e)) });
             return;
           }
           // legacy apply uses setOffsets (keeps existing behavior)
           try {
             const res = await client.setOffsets(connectorName, body);
             getOutputChannel().appendLine(`[offsets] Applied offsets for ${connectorName}: ${JSON.stringify(res)}`);
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: true, result: res });
+            panel.webview.postMessage({ cmd: 'applyResult', success: true, result: res });
           } catch (e: any) {
             getOutputChannel().appendLine(`[error] apply offsets failed: ${e.message || String(e)}`);
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: false, message: e.message || String(e) });
+            panel.webview.postMessage({ cmd: 'applyResult', success: false, message: e.message || String(e) });
           }
         } else if (msg.cmd === 'refresh') {
           try {
             const newOffsets = await client.getOffsets(connectorName);
-            this.panel.webview.postMessage({ cmd: 'refreshResult', offsets: newOffsets });
+            panel.webview.postMessage({ cmd: 'refreshResult', offsets: newOffsets });
           } catch (e: any) {
-            this.panel.webview.postMessage({ cmd: 'refreshResult', error: e.message || String(e) });
+            panel.webview.postMessage({ cmd: 'refreshResult', error: e.message || String(e) });
           }
         } else if (msg.cmd === 'sendMethod') {
           // msg.method: 'PUT' | 'POST' | 'PATCH'
@@ -80,24 +85,24 @@ export class OffsetEditor {
           try {
             body = JSON.parse(msg.payload);
           } catch (e: any) {
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: false, message: 'Invalid JSON: ' + (e.message || String(e)) });
+            panel.webview.postMessage({ cmd: 'applyResult', success: false, message: 'Invalid JSON: ' + (e.message || String(e)) });
             return;
           }
           try {
             const res = await client.setOffsetsMethod(connectorName, body, msg.method);
             getOutputChannel().appendLine(`[offsets] setOffsets ${msg.method} for ${connectorName}: ${JSON.stringify(res)}`);
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: true, result: res });
+            panel.webview.postMessage({ cmd: 'applyResult', success: true, result: res });
           } catch (e: any) {
             getOutputChannel().appendLine(`[error] setOffsets ${msg.method} failed: ${e.message || String(e)}`);
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: false, message: e.message || String(e) });
+            panel.webview.postMessage({ cmd: 'applyResult', success: false, message: e.message || String(e) });
           }
         } else if (msg.cmd === 'stopConnector') {
           try {
             await client.stopConnector(connectorName);
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: true, result: { stopped: true } });
+            panel.webview.postMessage({ cmd: 'applyResult', success: true, result: { stopped: true } });
           } catch (e: any) {
             getOutputChannel().appendLine(`[error] stopConnector failed: ${e.message || String(e)}`);
-            this.panel.webview.postMessage({ cmd: 'applyResult', success: false, message: e.message || String(e) });
+            panel.webview.postMessage({ cmd: 'applyResult', success: false, message: e.message || String(e) });
           }
         }
       } catch (e: any) {
