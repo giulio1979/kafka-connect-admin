@@ -1,3 +1,4 @@
 {
-  "connectAdmin.connections": []
+  "connectAdmin.connections": [],
+  "java.compile.nullAnalysis.mode": "disabled"
 }

@@ -5,21 +5,26 @@ import { OffsetEditor } from './offsetEditor';
 import { getOutputChannel } from '../logger';
 
 export class ConnectorView {
-  private panel?: any;
+  private panels: Map<string, any> = new Map();
   constructor(private context: vscode.ExtensionContext) {}
 
   public async open(connMeta: ConnectionMeta, connectorName: string, store: any) {
     const id = `connector-${connMeta.id}-${connectorName}`.replace(/[^a-z0-9\-]/gi, '-');
-    if (this.panel) {
-      this.panel.reveal();
+    
+    // Check if a panel already exists for this specific connector
+    let panel = this.panels.get(id);
+    if (panel) {
+      panel.reveal();
+      return; // Don't reprocess if panel already exists and is being revealed
     } else {
-      this.panel = (vscode as any).window.createWebviewPanel(
+      panel = (vscode as any).window.createWebviewPanel(
         'connectorView',
         `${connectorName}`,
         { viewColumn: (vscode as any).ViewColumn.One, preserveFocus: false },
         { enableScripts: true }
       );
-      this.panel.onDidDispose(() => { this.panel = undefined; });
+      this.panels.set(id, panel);
+      panel.onDidDispose(() => { this.panels.delete(id); });
     }
 
     const secret = await store.getSecret(connMeta.id);
@@ -42,10 +47,10 @@ export class ConnectorView {
     } catch (e) { offsets = { error: String(e) }; }
 
   const html = this.renderHtml(connectorName, connMeta, status, offsets);
-    this.panel!.webview.html = html;
+    panel.webview.html = html;
 
     // handle messages from the webview for actions
-    this.panel!.webview.onDidReceiveMessage(async (msg: any) => {
+    panel.webview.onDidReceiveMessage(async (msg: any) => {
       try {
         getOutputChannel().appendLine(`[webview] received ${msg.cmd} for ${connectorName}`);
         if (msg.cmd === 'pause') {
@@ -60,7 +65,7 @@ export class ConnectorView {
         } else if (msg.cmd === 'restart') {
           const res = await client.restartConnector(connectorName, true, false);
           getOutputChannel().appendLine(`[action] restarted ${connectorName}`);
-          this.panel!.webview.postMessage({ cmd: 'update', status: await client.getStatus(connectorName), offsets: await client.getOffsets(connectorName), restartResult: res });
+          panel.webview.postMessage({ cmd: 'update', status: await client.getStatus(connectorName), offsets: await client.getOffsets(connectorName), restartResult: res });
         } else if (msg.cmd === 'editOffsets') {
           // open the editable offsets editor
           const editor = new OffsetEditor(this.context);
@@ -69,14 +74,14 @@ export class ConnectorView {
         } else if (msg.cmd === 'refresh') {
           const newStatus = await client.getStatus(connectorName);
           const newOffsets = await client.getOffsets(connectorName);
-          this.panel!.webview.postMessage({ cmd: 'update', status: newStatus, offsets: newOffsets });
+          panel.webview.postMessage({ cmd: 'update', status: newStatus, offsets: newOffsets });
           getOutputChannel().appendLine(`[action] refreshed ${connectorName}`);
         } else if (msg.cmd === 'patchOffsets') {
           let body: any;
           try {
             body = JSON.parse(msg.payload);
           } catch (e: any) {
-            this.panel!.webview.postMessage({ cmd: 'error', message: 'Invalid JSON: ' + (e.message || String(e)) });
+            panel.webview.postMessage({ cmd: 'error', message: 'Invalid JSON: ' + (e.message || String(e)) });
             return;
           }
           try {
@@ -85,15 +90,15 @@ export class ConnectorView {
             // auto-refresh after save
             const newStatus = await client.getStatus(connectorName);
             const newOffsets = await client.getOffsets(connectorName);
-            this.panel!.webview.postMessage({ cmd: 'update', status: newStatus, offsets: newOffsets });
+            panel.webview.postMessage({ cmd: 'update', status: newStatus, offsets: newOffsets });
           } catch (e: any) {
             getOutputChannel().appendLine(`[error] PATCH offsets failed: ${e.message || String(e)}`);
-            this.panel!.webview.postMessage({ cmd: 'error', message: e.message || String(e) });
+            panel.webview.postMessage({ cmd: 'error', message: e.message || String(e) });
           }
         }
       } catch (e: any) {
         getOutputChannel().appendLine(`[error] webview action failed: ${e.message || String(e)}`);
-        this.panel!.webview.postMessage({ cmd: 'error', message: e.message || String(e) });
+        panel.webview.postMessage({ cmd: 'error', message: e.message || String(e) });
       }
     });
   }

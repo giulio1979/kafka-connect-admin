@@ -13,3 +13,8 @@
 - you write tests for code and ensure high test coverage
 - you write testable code
 - i am using VSCODE in windows 11 and I run docker containers in WSL
+
+## Known Issues & Solutions
+- **Multiple Connector View Stability (Fixed v0.0.5)**: Implemented per-connector panel isolation using Map-based panel management to prevent data mixing between multiple open connector views. Each connector now maintains its own webview panel instance with proper cleanup on disposal.
+- **VS Code Extension Pattern**: For webview panels, always use unique identifiers and proper state isolation when dealing with multiple instances of the same view type.
+- **Memory Management**: Always implement proper cleanup in onDidDispose handlers to prevent memory leaks in long-running extension sessions.

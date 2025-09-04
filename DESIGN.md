@@ -12,6 +12,7 @@ Purpose: capture the first-stage design for a VS Code extension to manage Kafka 
 - [x] Display current offset (RAW / as String) in an editable text area
 - [x] Modify offset and set it to the connector
 - [x] Copy schema from one Schema Registry to another (commander-style view), two registries side-by-side
+- [x] **Fixed**: Multiple connector views stability issue (v0.0.5 patch)
 
 Notes: items above are the scope for the design and planned MVP. Implementation will follow this document.
 
@@ -138,6 +139,68 @@ Implementation note: the Confluent docs contain variations between OSS Schema Re
 ## Next steps
 - Start scaffolding the extension and implement the Connection Manager and API clients.
 - Deliverables for the next checkpoint: `package.json`, `src/extension.ts`, `src/connectionStore.ts`, `src/clients/*` stubs, and basic tree view wiring.
+
+## Known Issues & Fixes
+
+### Multiple Connector Views Data Mixing (Fixed in v0.0.5)
+
+**Issue**: When multiple connectors were opened simultaneously, the connector views would randomly show data from different connectors, creating an unstable and confusing user experience.
+
+**Root Cause**: The `ConnectorView` class was designed as a singleton with a single `panel` property. When opening multiple connectors:
+1. All connectors shared the same webview panel instance
+2. The HTML content was replaced without proper isolation between connectors
+3. Event handlers were overwritten, causing actions from one connector to affect another
+4. The auto-refresh timer (15-second interval) would refresh with random connector data
+
+**Technical Details**:
+```typescript
+// Problem: Single panel instance shared across all connectors
+export class ConnectorView {
+  private panel?: any;  // ❌ Shared panel causes data mixing
+  
+  public async open(connMeta: ConnectionMeta, connectorName: string, store: any) {
+    if (this.panel) {
+      this.panel.reveal();  // ❌ Reuses existing panel
+    } else {
+      this.panel = vscode.window.createWebviewPanel(...);
+    }
+    // ❌ HTML content gets replaced, events overwritten
+    this.panel.webview.html = html;
+  }
+}
+```
+
+**Solution**: Implemented per-connector panel isolation using a Map-based approach:
+```typescript
+// Fix: Separate panel instances per connector
+export class ConnectorView {
+  private panels: Map<string, any> = new Map();  // ✅ Panel per connector
+  
+  public async open(connMeta: ConnectionMeta, connectorName: string, store: any) {
+    const id = `connector-${connMeta.id}-${connectorName}`;
+    let panel = this.panels.get(id);
+    if (panel) {
+      panel.reveal();
+      return;  // ✅ Don't reprocess if panel exists
+    } else {
+      panel = vscode.window.createWebviewPanel(...);
+      this.panels.set(id, panel);  // ✅ Store unique panel
+      panel.onDidDispose(() => { this.panels.delete(id); });  // ✅ Cleanup
+    }
+    // ✅ Each connector has its own isolated webview
+  }
+}
+```
+
+**Benefits**:
+- Each connector now has its own isolated webview panel
+- Data no longer mixes between different connectors
+- Actions (pause, resume, restart) are properly scoped to the correct connector
+- Auto-refresh works independently for each connector
+- Memory is properly cleaned up when panels are closed
+
+**Files Modified**:
+- `src/views/connectorView.ts`: Complete refactor of panel management
 
 ---
 
