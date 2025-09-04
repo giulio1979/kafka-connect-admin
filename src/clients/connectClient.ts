@@ -15,30 +15,53 @@ export class ConnectClient {
   }
 
   async listConnectors(): Promise<string[]> {
-    const res = await fetch(`${this.baseUrl}/connectors`, { headers: this.headers });
-    if (!res.ok) throw new Error(`Failed to list connectors: ${res.status}`);
-  return (await res.json()) as string[];
+    const headers = { 'Accept': 'application/json', ...this.headers };
+    const res = await fetch(`${this.baseUrl}/connectors`, { headers });
+    if (!res.ok) {
+      let errorBody = '';
+      try {
+        errorBody = await res.text();
+      } catch (e) {
+        // Ignore parse errors
+      }
+      const errorMsg = `Failed to list connectors: ${res.status} ${res.statusText}${errorBody ? ' - ' + errorBody : ''}`;
+      throw new Error(errorMsg);
+    }
+    return (await res.json()) as string[];
   }
 
   async getStatus(name: string): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/status`, { headers: this.headers });
-    if (!res.ok) throw new Error(`Failed to get status: ${res.status}`);
-  return (await res.json()) as any;
+    const headers = { 'Accept': 'application/json', ...this.headers };
+    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/status`, { headers });
+    if (!res.ok) {
+      let errorBody = '';
+      try {
+        errorBody = await res.text();
+      } catch (e) {
+        // Ignore parse errors
+      }
+      const errorMsg = `Failed to get status: ${res.status} ${res.statusText}${errorBody ? ' - ' + errorBody : ''}`;
+      throw new Error(errorMsg);
+    }
+    return (await res.json()) as any;
   }
 
   async pauseConnector(name: string): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/pause`, { method: 'PUT', headers: this.headers });
+    const headers = { 'Accept': 'application/json', ...this.headers };
+    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/pause`, { method: 'PUT', headers });
     if (!res.ok) throw new Error(`Pause failed: ${res.status}`);
   }
 
   async resumeConnector(name: string): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/resume`, { method: 'PUT', headers: this.headers });
+    const headers = { 'Accept': 'application/json', ...this.headers };
+    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/resume`, { method: 'PUT', headers });
     if (!res.ok) throw new Error(`Resume failed: ${res.status}`);
   }
 
   // offsets endpoints can vary; implement a basic fetch/set
   async getOffsets(name: string): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/offsets`, { headers: this.headers });
+    const headers = { 'Accept': 'application/json', ...this.headers };
+    const res = await fetch(`${this.baseUrl}/connectors/${encodeURIComponent(name)}/offsets`, { headers });
     if (!res.ok) throw new Error(`Get offsets failed: ${res.status}`);
   return (await res.json()) as any;
   }

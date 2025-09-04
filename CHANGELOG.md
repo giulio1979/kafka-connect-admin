@@ -17,6 +17,12 @@ The format is based on "Keep a Changelog" and this project follows semantic vers
 - **Code Quality**: Removed all debug console.log statements from production code, replaced with proper logging system
 - **Tests**: Fixed failing unit tests by adding proper VS Code API mocking for Jest test environment
 
+### Added
+- **Comprehensive Authentication Tests**: Added extensive test suite for connection authentication scenarios
+- **401 Error Debugging**: Added specialized tests for diagnosing authentication failures
+- **Connection Troubleshooting**: Added utilities and tests to help debug real-world connection issues
+- **Test Coverage**: Added 25+ new tests covering Basic Auth, Bearer Token, and error scenarios
+
 ### Technical Details
 - Refactored `ConnectorView` class from singleton pattern to multi-instance panel management
 - Refactored `OffsetEditor` class from singleton pattern to multi-instance panel management
@@ -28,6 +34,9 @@ The format is based on "Keep a Changelog" and this project follows semantic vers
 - All debug logging now goes through centralized `getOutputChannel()` system with consistent formatting
 - Added comprehensive VS Code API mock (`__mocks__/vscode.js`) supporting all required interfaces
 - Updated Jest configuration with proper setup for VS Code extension testing
+- Added `connectionAuth.test.ts` with 18 authentication scenario tests
+- Added `connectionTroubleshooting.test.ts` with 25 diagnostic and validation tests
+- Added `connectionDebugging.test.ts` with real-environment debugging utilities
 
 ## [0.0.1] - 2025-09-03
 ### Added
