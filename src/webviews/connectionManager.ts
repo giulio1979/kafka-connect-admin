@@ -17,51 +17,54 @@ export function createConnectionManagerPanel(context: vscode.ExtensionContext, s
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
     <style>
-      body { font-family: 'Segoe UI', Arial, sans-serif; margin: 16px; background-color: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
-      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-      .header h2 { margin: 0; color: var(--vscode-foreground); }
-      .toolbar { display: flex; gap: 8px; }
-      .btn { padding: 8px 16px; border: 1px solid var(--vscode-button-border); background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-radius: 4px; cursor: pointer; font-size: 13px; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; margin: 12px; background-color: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
+      .header { margin-bottom: 12px; }
+      .header h2 { margin: 0 0 8px 0; color: var(--vscode-foreground); }
+      .toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+      .btn { padding: 6px 12px; border: 1px solid var(--vscode-button-border); background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-radius: 4px; cursor: pointer; font-size: 13px; }
       .btn:hover { background: var(--vscode-button-hoverBackground); }
       .btn.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-weight: 600; }
       .btn.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
       .btn:disabled { opacity: 0.6; cursor: not-allowed; }
       
-      .form-container { margin-bottom: 16px; padding: 16px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
+      .form-container { margin-bottom: 12px; padding: 12px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-editor-background); }
       .form-container.hidden { display: none; }
       .form-container.show { display: block; animation: slideDown 0.2s ease-out; }
       @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
       
-      .form-title { margin: 0 0 16px 0; color: var(--vscode-foreground); font-size: 16px; font-weight: 600; }
-      .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+      .form-title { margin: 0 0 12px 0; color: var(--vscode-foreground); font-size: 16px; font-weight: 600; }
+      .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
       @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
       
-      .form-group { margin-bottom: 12px; }
-      .form-group label { display: block; margin-bottom: 4px; font-weight: 600; color: var(--vscode-foreground); font-size: 13px; }
-      .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 4px; font-size: 13px; }
+      .form-group { margin-bottom: 8px; }
+      .form-group label { display: block; margin-bottom: 3px; font-weight: 600; color: var(--vscode-foreground); font-size: 13px; }
+      .form-group input, .form-group select { width: 100%; padding: 6px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 4px; font-size: 13px; }
       .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--vscode-focusBorder); }
       
-      .form-actions { display: flex; gap: 8px; align-items: center; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
-      .form-status { margin-left: 12px; font-size: 13px; }
+      .auth-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+      @media (max-width: 600px) { .auth-fields { grid-template-columns: 1fr; } }
+      
+      .form-actions { display: flex; gap: 6px; align-items: center; padding-top: 6px; border-top: 1px solid var(--vscode-panel-border); }
+      .form-status { margin-left: 8px; font-size: 13px; }
       .form-status.success { color: var(--vscode-testing-iconPassed); }
       .form-status.error { color: var(--vscode-testing-iconFailed); }
       
       .connections-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-      .connections-table th, .connections-table td { padding: 12px 8px; border: 1px solid var(--vscode-panel-border); text-align: left; }
+      .connections-table th, .connections-table td { padding: 8px 6px; border: 1px solid var(--vscode-panel-border); text-align: left; }
       .connections-table th { background: var(--vscode-editor-background); font-weight: 600; color: var(--vscode-foreground); }
       .connections-table tr:nth-child(even) { background: var(--vscode-list-hoverBackground); }
       .connections-table tr:hover { background: var(--vscode-list-activeSelectionBackground); }
       .connections-table .actions { white-space: nowrap; }
-      .connections-table .actions .btn { padding: 4px 8px; margin-right: 4px; font-size: 12px; }
+      .connections-table .actions .btn { padding: 3px 6px; margin-right: 3px; font-size: 12px; }
       
-      .status-bar { margin-top: 16px; padding: 8px 12px; border-radius: 4px; font-size: 13px; }
+      .status-bar { margin-top: 12px; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
       .status-bar.success { background: var(--vscode-testing-iconPassed); color: white; }
       .status-bar.error { background: var(--vscode-testing-iconFailed); color: white; }
       .status-bar.info { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
       
-      .empty-state { text-align: center; padding: 40px 20px; color: var(--vscode-descriptionForeground); }
-      .empty-state h3 { margin: 0 0 8px 0; }
-      .empty-state p { margin: 0 0 16px 0; }
+      .empty-state { text-align: center; padding: 30px 15px; color: var(--vscode-descriptionForeground); }
+      .empty-state h3 { margin: 0 0 6px 0; }
+      .empty-state p { margin: 0 0 12px 0; }
     </style>
     </head>
     <body>
@@ -74,8 +77,8 @@ export function createConnectionManagerPanel(context: vscode.ExtensionContext, s
         </div>
       </div>
       
-      <div class="info-banner" style="margin-bottom: 16px; padding: 12px; background: var(--vscode-editor-inactiveSelectionBackground); border-left: 4px solid var(--vscode-button-background); border-radius: 4px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
+      <div class="info-banner" style="margin-bottom: 12px; padding: 10px; background: var(--vscode-editor-inactiveSelectionBackground); border-left: 4px solid var(--vscode-button-background); border-radius: 4px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
           <span style="font-size: 16px;">💡</span>
           <div style="font-size: 13px;">
             <strong>Connections and passwords are saved to settings.json!</strong> 
@@ -106,24 +109,24 @@ export function createConnectionManagerPanel(context: vscode.ExtensionContext, s
             <input id="f_url" name="url" placeholder="e.g., http://localhost:8083" required/>
           </div>
           
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="f_auth">Authentication</label>
-              <select id="f_auth" name="auth">
-                <option value="none">None</option>
-                <option value="basic">Basic Auth</option>
-                <option value="bearer">Bearer Token</option>
-              </select>
-            </div>
-            <div id="basicFields" class="form-group" style="display:none;">
+          <div class="form-group">
+            <label for="f_auth">Authentication</label>
+            <select id="f_auth" name="auth">
+              <option value="none">None</option>
+              <option value="basic">Basic Auth</option>
+              <option value="bearer">Bearer Token</option>
+            </select>
+          </div>
+          
+          <div id="authFieldsContainer" class="auth-fields" style="display:none;">
+            <div id="basicFields" class="form-group">
               <label for="f_username">Username</label>
               <input id="f_username" name="username" placeholder="Username"/>
             </div>
-          </div>
-          
-          <div id="secretField" class="form-group" style="display:none;">
-            <label for="f_secret">Password / Token</label>
-            <input id="f_secret" name="secret" type="password" placeholder="Enter password or bearer token"/>
+            <div id="secretField" class="form-group">
+              <label for="f_secret">Password / Token</label>
+              <input id="f_secret" name="secret" type="password" placeholder="Enter password or bearer token"/>
+            </div>
           </div>
           
           <div class="form-actions">
@@ -185,6 +188,7 @@ export function createConnectionManagerPanel(context: vscode.ExtensionContext, s
         const cancelBtn = document.getElementById('cancelBtn');
         const formStatus = document.getElementById('formStatus');
         const authSel = document.getElementById('f_auth');
+        const authFieldsContainer = document.getElementById('authFieldsContainer');
         const basicFields = document.getElementById('basicFields');
         const secretField = document.getElementById('secretField');
         
@@ -216,16 +220,17 @@ export function createConnectionManagerPanel(context: vscode.ExtensionContext, s
         function updateAuthFields() {
           const authType = authSel.value;
           if (authType === 'basic') { 
-            basicFields.style.display = ''; 
-            secretField.style.display = ''; 
+            authFieldsContainer.style.display = 'grid';
+            basicFields.style.display = 'block';
+            secretField.style.display = 'block'; 
             document.getElementById('f_secret').placeholder = 'Enter password';
           } else if (authType === 'bearer') { 
-            basicFields.style.display = 'none'; 
-            secretField.style.display = ''; 
+            authFieldsContainer.style.display = 'grid';
+            basicFields.style.display = 'none';
+            secretField.style.display = 'block'; 
             document.getElementById('f_secret').placeholder = 'Enter bearer token';
           } else { 
-            basicFields.style.display = 'none'; 
-            secretField.style.display = 'none'; 
+            authFieldsContainer.style.display = 'none';
           }
         }
 
