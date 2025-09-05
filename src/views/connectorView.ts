@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConnectClient } from '../clients/connectClient';
-import { ConnectionMeta } from '../connectionStore';
+import { ConnectionMeta, CredentialManagerIntegration } from '../credentialManagerIntegration';
 import { OffsetEditor } from './offsetEditor';
 import { getOutputChannel } from '../logger';
 
@@ -8,7 +8,7 @@ export class ConnectorView {
   private panels: Map<string, any> = new Map();
   constructor(private context: vscode.ExtensionContext) {}
 
-  public async open(connMeta: ConnectionMeta, connectorName: string, store: any) {
+  public async open(connMeta: ConnectionMeta, connectorName: string, credentialManager: CredentialManagerIntegration) {
     const id = `connector-${connMeta.id}-${connectorName}`.replace(/[^a-z0-9\-]/gi, '-');
     
     // Check if a panel already exists for this specific connector
@@ -27,13 +27,7 @@ export class ConnectorView {
       panel.onDidDispose(() => { this.panels.delete(id); });
     }
 
-    const secret = await store.getSecret(connMeta.id);
-    const headers: Record<string,string> = {};
-    if (connMeta.authType === 'basic' && connMeta.username && secret) {
-      headers['Authorization'] = 'Basic ' + Buffer.from(connMeta.username + ':' + secret).toString('base64');
-    } else if (connMeta.authType === 'bearer' && secret) {
-      headers['Authorization'] = `Bearer ${secret}`;
-    }
+    const headers = await credentialManager.buildAuthHeaders(connMeta);
     const client = new ConnectClient({ baseUrl: connMeta.url, headers });
 
     // fetch status and offsets

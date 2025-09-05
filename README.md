@@ -2,25 +2,26 @@
 
 Connect Admin is a VS Code extension to manage Apache Kafka Connect clusters and Confluent Schema Registry instances directly from the editor.
 
-This README documents the features implemented in this repository, how to run and test the extension, and short usage notes.
+This extension now uses the [Kafka Credential Manager](https://marketplace.visualstudio.com/items?itemName=IuliusHutuleac.credential-manager) extension for secure connection and credential management.
+
+## Prerequisites
+
+**Required Extension**: This extension depends on the **Kafka Credential Manager** extension for managing connections and credentials securely. Please install it from the VS Code marketplace or it will be automatically installed when you install this extension.
 
 ## Features (implemented)
 
-- Connections management
-	- Store multiple named connections for two connection types: Kafka Connect (`connect`) and Schema Registry (`schema-registry`).
-	- Add, edit, remove and test connections from a Connection Manager webview.
-	- Credentials/secrets are stored securely using the VS Code SecretStorage API.
-	- Supports authentication modes: none, basic (username+password), and bearer token.
+- **Connection Management**
+	- Integrates with the Kafka Credential Manager extension for secure connection storage
+	- Supports Kafka Connect (`connect`) and Schema Registry (`schema-registry`) connections
+	- Authentication modes: none, basic (username+password), and bearer token
+	- Credentials are securely stored using VS Code's built-in SecretStorage API
 
-- Explorer tree view
-	- A custom explorer view is contributed under the `Explorer` panel named "Connect Admin" showing registered connections, connectors, subjects and schema versions.
-	- Right-click context menu actions are available per-item (refresh, edit, remove, copy/paste schema, connector actions).
+- **Explorer tree view**
+	- A custom explorer view under the `Explorer` panel named "Connect Admin" showing registered connections from Credential Manager
+	- Displays connectors, subjects and schema versions
+	- Right-click context menu actions are available per-item (copy/paste schema, connector actions)
 
-- Commands (typical / useful ones implemented)
-	- connectAdmin.addConnection — open Connection Manager to add a new connection
-	- connectAdmin.editConnection / connectAdmin.openEditConnection — edit an existing connection
-	- connectAdmin.removeConnection — remove a saved connection
-	- connectAdmin.testConnection — test a connection (Connect: list connectors, Schema Registry: list subjects)
+- **Commands (typical / useful ones implemented)**
 	- connectAdmin.refreshConnections — refresh the Connections tree
 	- connectAdmin.connector.pause / connectAdmin.connector.resume — pause or resume a connector
 	- connectAdmin.connector.showOffsets — open the connector offsets/consumer-position view
@@ -29,27 +30,50 @@ This README documents the features implemented in this repository, how to run an
 	- connectAdmin.copySchemaVersion / connectAdmin.pasteSchemaVersion (hooks present for version-level copy/paste)
 	- connectAdmin.openConnector / connectAdmin.openSchemaVersion — open connector details or a specific schema version in a webview
 
-- Schema copy & paste
+## Getting Started
+
+1. **Install the Kafka Credential Manager extension** (if not already installed):
+   - Open VS Code Command Palette (`Ctrl+Shift+P`)
+   - Run `Extensions: Install Extensions`
+   - Search for "Kafka Credential Manager" by IuliusHutuleac
+   - Install the extension
+
+2. **Add connections using the Credential Manager**:
+   - Click the "Connections" button in the status bar (bottom of VS Code)
+   - Or use Command Palette: `Credential Manager: Open Connection Manager`
+   - Add your Kafka Connect and Schema Registry connections with proper authentication
+
+3. **Explore your connections**:
+   - Open the "Connect Admin" view in the Explorer sidebar
+   - Expand your connections to see connectors, subjects, and schema versions
+   - Right-click on items for available actions
+
+## Key Features
+
+- **Schema copy & paste**
 	- Copy a schema subject (fetches all available versions) into an in-memory clipboard used by the extension.
 	- Paste supports multi-version replay (registers versions in ascending order) and single-schema payloads.
 	- Paste includes best-effort verification: attempts to fetch the registered schema, checks by id when returned, and performs diagnostic lookups when verification fails.
 	- Robust handling of different schema payload shapes (various JSON payloads, schema vs schemaString, nested objects, Avro/JSON payloads).
 
-- Connector management
+- **Connector management**
 	- Pause and resume connectors via Connect REST API.
 	- Open connector view to inspect and edit connector offsets (OffsetEditor/ConnectorView webviews).
 
-- UI and developer convenience
-	- Connection Manager webview for add/edit flows.
-	- Connector webview and offset editor.
+- **Integration with Credential Manager**
+	- Secure credential storage using VS Code's built-in SecretStorage API
+	- Centralized connection management shared across Kafka extensions
+	- Support for multiple authentication types
+
+- **UI and developer convenience**
 	- Simple status bar item for quick access to the Connection Manager.
 	- Extension output channel logging for diagnostic messages.
 
-- Clients and integration
+- **Clients and integration**
 	- HTTP clients for Connect and Schema Registry interactions (including an OfficialSchemaRegistryClient wrapper).
 	- Docker Compose configuration included for bringing up an integration stack (Kafka, Connect, Schema Registry) used by integration tests.
 
-## Quickstart (developer)
+## Development
 
 1. Install dependencies:
 
@@ -72,11 +96,37 @@ npm test
 4. Run (development):
 	 - Open this folder in VS Code and run the "Run Extension" launch configuration in the Debug panel. The extension will activate and the `Connect Admin` tree view will appear in Explorer.
 
-## How to use
+## Migration from Previous Versions
 
-- Adding a connection
-	- Use the Command Palette (Ctrl+Shift+P) and run `Connect Admin: Add Connection` (or `connectAdmin.addConnection`) to open the Connection Manager webview.
-	- Provide a name, URL, type (Connect or Schema Registry) and optional auth settings. Secrets are saved in VS Code secure storage.
+If you were using a previous version of this extension that had built-in connection management:
+
+1. **Your existing connections** will no longer be visible in this extension
+2. **Install the Kafka Credential Manager extension** as described above
+3. **Re-create your connections** using the Credential Manager
+4. **Your connection data** from the old version was stored in VS Code settings and is still there, but this extension no longer reads from those locations
+
+## Usage Tips
+
+- **Adding connections**
+	- Use the status bar "Connections" button for quick access to the Credential Manager
+	- Or use Command Palette: `Credential Manager: Open Connection Manager`
+	- Provide a name, URL, type (Connect or Schema Registry) and optional auth settings
+
+- **Working with schemas**
+	- Right-click on a schema subject to copy all versions
+	- Right-click on a specific version to copy just that version  
+	- Paste schemas to other subjects or connections using the context menu
+
+- **Managing connectors**
+	- Click on a connector to view its details and configuration
+	- Use context menu options to pause/resume connectors
+	- View and edit connector offsets when needed
+
+## Troubleshooting
+
+- **"No connections found"**: Make sure the Credential Manager extension is installed and you've added connections through it
+- **Authentication errors**: Verify your credentials in the Credential Manager
+- **Extension not loading**: Check the Output panel (View → Output → Connect Admin) for error messages
 
 - Managing connectors
 	- Expand a `connect` connection in the Connect Admin view and choose a connector. Right-click to pause/resume or open offsets.

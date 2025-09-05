@@ -18,31 +18,12 @@
   },
   "publisher": "IuliusHutuleac",
   "main": "out/extension.js",
-  "activationEvents": [
-    "onCommand:connectAdmin.hello",
-    "onCommand:connectAdmin.addConnection",
-    "onCommand:connectAdmin.editConnection",
-    "onCommand:connectAdmin.removeConnection",
-    "onCommand:connectAdmin.testConnection",
-    "onCommand:connectAdmin.refreshConnections",
-    "onCommand:connectAdmin.connector.pause",
-    "onCommand:connectAdmin.connector.resume",
-    "onCommand:connectAdmin.connector.showOffsets",
-    "onView:connectAdmin.connections"
-  ],
+  "activationEvents": [],
   "contributes": {
     "commands": [
       {
         "command": "connectAdmin.hello",
         "title": "Hello"
-      },
-      {
-        "command": "connectAdmin.openEditConnection",
-        "title": "Open Edit Connection"
-      },
-      {
-        "command": "connectAdmin.openConnectionManager",
-        "title": "Open Connection Manager"
       },
       {
         "command": "connectAdmin.copySchemaVersion",
@@ -51,22 +32,6 @@
       {
         "command": "connectAdmin.pasteSchemaVersion",
         "title": "Paste Schema Version"
-      },
-      {
-        "command": "connectAdmin.addConnection",
-        "title": "Add Connection"
-      },
-      {
-        "command": "connectAdmin.editConnection",
-        "title": "Edit Connection"
-      },
-      {
-        "command": "connectAdmin.removeConnection",
-        "title": "Remove Connection"
-      },
-      {
-        "command": "connectAdmin.testConnection",
-        "title": "Test Connection"
       },
       {
         "command": "connectAdmin.refreshConnections",
@@ -124,21 +89,6 @@
     },
     "menus": {
       "view/item/context": [
-        {
-          "when": "view == connectAdmin.connections && viewItem == connection",
-          "command": "connectAdmin.editConnection",
-          "group": "1_modify"
-        },
-        {
-          "when": "view == connectAdmin.connections && viewItem == connection",
-          "command": "connectAdmin.testConnection",
-          "group": "2_test"
-        },
-        {
-          "when": "view == connectAdmin.connections && viewItem == connection",
-          "command": "connectAdmin.removeConnection",
-          "group": "9_delete"
-        },
         {
           "when": "view == connectAdmin.connections && viewItem == connection.schemaRegistry",
           "command": "connectAdmin.pasteSchemaToConnection",
@@ -203,7 +153,7 @@
       "view/title": [
         {
           "when": "view == connectAdmin.connections",
-          "command": "connectAdmin.openConnectionManager",
+          "command": "credentialManager.openConnectionManager",
           "group": "navigation"
         },
         {
@@ -212,52 +162,6 @@
           "group": "navigation"
         }
       ]
-    },
-    "configuration": {
-      "title": "Connect Admin",
-      "properties": {
-        "connectAdmin.connections": {
-          "type": "array",
-          "default": [],
-          "description": "Kafka Connect and Schema Registry connections",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Unique identifier for the connection"
-              },
-              "name": {
-                "type": "string",
-                "description": "Display name for the connection"
-              },
-              "url": {
-                "type": "string",
-                "description": "Base URL for the connection"
-              },
-              "type": {
-                "type": "string",
-                "enum": ["connect", "schema-registry"],
-                "description": "Type of connection"
-              },
-              "authType": {
-                "type": "string",
-                "enum": ["none", "basic", "bearer"],
-                "description": "Authentication type"
-              },
-              "username": {
-                "type": "string",
-                "description": "Username for basic authentication"
-              },
-              "password": {
-                "type": "string",
-                "description": "Password/token stored as base64. Note: Base64 is encoding, not encryption - anyone with file access can decode this."
-              }
-            },
-            "required": ["id", "name", "url", "type"]
-          }
-        }
-      }
     }
   },
   "scripts": {
@@ -277,5 +181,8 @@
   "dependencies": {
     "@confluentinc/schemaregistry": "^1.4.1",
     "axios": "^1.4.0"
-  }
+  },
+  "extensionDependencies": [
+    "IuliusHutuleac.credential-manager"
+  ]
 }

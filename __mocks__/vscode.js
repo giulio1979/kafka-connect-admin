@@ -49,6 +49,10 @@ const vscode = {
     WorkspaceFolder: 3
   },
 
+  extensions: {
+    getExtension: jest.fn()
+  },
+
   StatusBarAlignment: {
     Left: 1,
     Right: 2

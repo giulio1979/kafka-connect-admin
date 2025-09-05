@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConnectClient } from '../clients/connectClient';
-import { ConnectionMeta } from '../connectionStore';
+import { ConnectionMeta } from '../credentialManagerIntegration';
 import { getOutputChannel } from '../logger';
 
 export class OffsetEditor {

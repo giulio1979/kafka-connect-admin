@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { SchemaRegistryClient } from '../clients/schemaRegistryClient';
+import { CredentialManagerIntegration } from '../credentialManagerIntegration';
 import { getOutputChannel } from '../logger';
 
 export class SchemaView {
@@ -9,15 +10,9 @@ export class SchemaView {
     this.context = context;
   }
 
-  async open(meta: any, subject: string, version: number, store: any) {
+  async open(meta: any, subject: string, version: number, credentialManager: CredentialManagerIntegration) {
     try {
-      const secret = await store.getSecret(meta.id);
-      const headers: Record<string, string> = {};
-      if (meta.authType === 'basic' && meta.username && secret) {
-        headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
-      } else if (meta.authType === 'bearer' && secret) {
-        headers['Authorization'] = `Bearer ${secret}`;
-      }
+      const headers = await credentialManager.buildAuthHeaders(meta);
 
       const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
       const schema = await client.getSchema(subject, version);
@@ -30,7 +25,7 @@ export class SchemaView {
       );
 
       await this.render(panel, schema, meta, subject, version, client);
-      this.setupMessageHandlers(panel, schema, meta, subject, version, client, store);
+      this.setupMessageHandlers(panel, schema, meta, subject, version, client, credentialManager);
 
     } catch (e: any) {
       vscode.window.showErrorMessage(`Failed to load schema: ${e.message || e}`);
@@ -463,7 +458,7 @@ export class SchemaView {
     `).join('');
   }
 
-  private setupMessageHandlers(panel: any, schema: any, meta: any, subject: string, version: number, client: SchemaRegistryClient, store: any) {
+  private setupMessageHandlers(panel: any, schema: any, meta: any, subject: string, version: number, client: SchemaRegistryClient, credentialManager: CredentialManagerIntegration) {
     panel.webview.onDidReceiveMessage(async (message: any) => {
       const oc = getOutputChannel();
       

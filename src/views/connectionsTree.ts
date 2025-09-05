@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { ConnectionMeta, ConnectionType } from '../connectionStore';
-import { ConnectionStore } from '../connectionStore';
+import { ConnectionMeta, ConnectionType, CredentialManagerIntegration } from '../credentialManagerIntegration';
 import { ConnectClient } from '../clients/connectClient';
 import { SchemaRegistryClient } from '../clients/schemaRegistryClient';
 
@@ -22,20 +21,32 @@ class ConnectorNode extends vscode.TreeItem {
 }
 
 export class ConnectionsTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-  private store?: ConnectionStore;
+  private credentialManager?: CredentialManagerIntegration;
   private context?: vscode.ExtensionContext;
   private _onDidChangeTreeData: any = new (vscode as any).EventEmitter();
   readonly onDidChangeTreeData: any = this._onDidChangeTreeData.event;
 
   constructor(context?: vscode.ExtensionContext) {
     if (context) {
-      this.store = new ConnectionStore(context);
+      this.credentialManager = new CredentialManagerIntegration(context);
       this.context = context;
+      
+      // Listen for credential manager connection changes
+      this.credentialManager.onConnectionsChanged(() => {
+        this.refresh();
+      });
     }
   }
 
   setContext(context: vscode.ExtensionContext) {
-    if (!this.store) this.store = new ConnectionStore(context);
+    if (!this.credentialManager) {
+      this.credentialManager = new CredentialManagerIntegration(context);
+      
+      // Listen for credential manager connection changes
+      this.credentialManager.onConnectionsChanged(() => {
+        this.refresh();
+      });
+    }
     this.context = context;
   }
 
@@ -76,11 +87,24 @@ export class ConnectionsTreeProvider implements vscode.TreeDataProvider<vscode.T
   }
 
   async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
-    if (!this.store) return [];
+    if (!this.credentialManager) return [];
 
     if (!element) {
-      const conns = await this.store.listConnections();
-      const nodes = conns.map(c => new ConnectionNode(c));
+      // Check if Credential Manager is available
+      if (!this.credentialManager.isCredentialManagerAvailable()) {
+        // Return a special node that prompts to install the extension
+        const promptNode = new vscode.TreeItem('Install Credential Manager Extension', vscode.TreeItemCollapsibleState.None);
+        (promptNode as any).contextValue = 'installPrompt';
+        (promptNode as any).command = {
+          command: 'credentialManager.openConnectionManager',
+          title: 'Install Credential Manager',
+          arguments: []
+        };
+        return [promptNode];
+      }
+
+      const conns = await this.credentialManager.listConnections();
+      const nodes = conns.map((c: ConnectionMeta) => new ConnectionNode(c));
       return nodes;
     }
 
@@ -89,13 +113,7 @@ export class ConnectionsTreeProvider implements vscode.TreeDataProvider<vscode.T
       const meta = (element as any).meta as ConnectionMeta;
       try {
         if (meta.type === 'connect') {
-          const secret = await this.store.getSecret(meta.id);
-          const headers: Record<string,string> = {};
-          if (meta.authType === 'basic' && meta.username && secret) {
-            headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
-          } else if (meta.authType === 'bearer' && secret) {
-            headers['Authorization'] = `Bearer ${secret}`;
-          }
+          const headers = await this.credentialManager.buildAuthHeaders(meta);
           const client = new ConnectClient({ baseUrl: meta.url, headers });
           const list = await client.listConnectors();
           return list.map(n => {
@@ -108,13 +126,7 @@ export class ConnectionsTreeProvider implements vscode.TreeDataProvider<vscode.T
           });
         }
         if (meta.type === 'schema-registry') {
-          const secret = await this.store.getSecret(meta.id);
-          const headers: Record<string,string> = {};
-          if (meta.authType === 'basic' && meta.username && secret) {
-            headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
-          } else if (meta.authType === 'bearer' && secret) {
-            headers['Authorization'] = `Bearer ${secret}`;
-          }
+          const headers = await this.credentialManager.buildAuthHeaders(meta);
           const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
           const subjects = await client.listSubjects();
           try { const oc = (await import('../logger')).getOutputChannel(); oc.appendLine(`[tree] ${meta.name} subjects count ${subjects.length}`); } catch(_) {}
@@ -137,14 +149,8 @@ export class ConnectionsTreeProvider implements vscode.TreeDataProvider<vscode.T
       const meta = (element as any).meta as ConnectionMeta;
       const subject = (element as any).subject as string;
       try {
-        const secret = await this.store.getSecret(meta.id);
-        const headers: Record<string,string> = {};
-        if (meta.authType === 'basic' && meta.username && secret) {
-          headers['Authorization'] = 'Basic ' + Buffer.from(meta.username + ':' + secret).toString('base64');
-        } else if (meta.authType === 'bearer' && secret) {
-          headers['Authorization'] = `Bearer ${secret}`;
-        }
-  const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
+        const headers = await this.credentialManager.buildAuthHeaders(meta);
+        const client = new SchemaRegistryClient({ baseUrl: meta.url, headers, name: meta.name });
         const versions = await client.getVersions(subject);
         return versions.map(v => {
           const versionNode = new vscode.TreeItem(`v${v}`, vscode.TreeItemCollapsibleState.None);
