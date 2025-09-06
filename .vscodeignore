@@ -1,14 +1,40 @@
-.vscode/**
-.vscode-test/**
-node_modules/**
-src/**
-.gitignore
-.yarnrc
-webpack.config.js
-vsc-extension-quickstart.md
-**/tsconfig.json
-**/eslint.config.mjs
-**/*.map
-**/*.ts
-**/.vscode-test.*
-docker/**
+# Dependencies
+node_modules/
+.npm/
+.yarn/
+
+# Build outputs
+docker
+build/
+pom.xml
+# Development files
+.vscode/
+.git/
+.github/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Test files
+coverage/
+.nyc_output/
+test/
+tests/
+**/*.test.*
+**/*.spec.*
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Configuration files that might cause issues
+.env
+.env.*
+settings.json
+launch.json
+
+# Symbolic links and special directories
+**/.git/
+**/node_modules/
