@@ -91,7 +91,7 @@ export class ConnectionsTreeProvider implements vscode.TreeDataProvider<vscode.T
 
     if (!element) {
       // Check if Credential Manager is available
-      if (!this.credentialManager.isCredentialManagerAvailable()) {
+      if (!(await this.credentialManager.isCredentialManagerAvailable())) {
         // Return a special node that prompts to install the extension
         const promptNode = new vscode.TreeItem('Install Credential Manager Extension', vscode.TreeItemCollapsibleState.None);
         (promptNode as any).contextValue = 'installPrompt';

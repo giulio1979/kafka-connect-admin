@@ -1,4 +1,13 @@
 {
-  "connectAdmin.connections": [],
-  "java.compile.nullAnalysis.mode": "disabled"
+  "java.compile.nullAnalysis.mode": "disabled",
+  "credentialManager.connections": [
+    {
+      "id": "1758131866464-0a19e0",
+      "name": "gateway",
+      "type": "flink-gateway",
+      "url": "https://gateway-eateam.data-sand-emea-001.internal.aks.dm.hcag.dev/",
+      "authType": "basic",
+      "username": "eateam-user"
+    }
+  ]
 }

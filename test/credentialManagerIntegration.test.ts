@@ -31,20 +31,30 @@ describe('CredentialManagerIntegration', () => {
     expect(connections.length).toBe(0);
   });
 
-  test('should check if credential manager is available', () => {
+  test('should check if credential manager is available', async () => {
     // Mock extension not found
     vscode.extensions.getExtension.mockReturnValue(undefined);
     
-    const isAvailable = credentialManager.isCredentialManagerAvailable();
+    const isAvailable = await credentialManager.isCredentialManagerAvailable();
     expect(typeof isAvailable).toBe('boolean');
     expect(isAvailable).toBe(false);
   });
 
-  test('should check if credential manager is available when extension exists', () => {
-    // Mock extension found
-    vscode.extensions.getExtension.mockReturnValue({ id: 'test' });
+  test('should check if credential manager is available when extension exists', async () => {
+    // Mock extension found and active
+    vscode.extensions.getExtension.mockReturnValue({ 
+      id: 'test',
+      isActive: true,
+      activate: jest.fn().mockResolvedValue(undefined),
+      exports: {
+        getCredential: jest.fn(),
+        setCredential: jest.fn(),
+        deleteCredential: jest.fn(),
+        listCredentials: jest.fn()
+      }
+    });
     
-    const isAvailable = credentialManager.isCredentialManagerAvailable();
+    const isAvailable = await credentialManager.isCredentialManagerAvailable();
     expect(isAvailable).toBe(true);
   });
 
@@ -62,7 +72,23 @@ describe('CredentialManagerIntegration', () => {
   });
 
   test('should get undefined secret for non-existent connection', async () => {
-    const secret = await credentialManager.getSecret('non-existent-id');
+    // Mock the credential manager extension
+    const mockAPI = {
+      getCredential: jest.fn().mockResolvedValue(undefined),
+      setCredential: jest.fn(),
+      deleteCredential: jest.fn(),
+      listCredentials: jest.fn()
+    };
+    
+    vscode.extensions.getExtension.mockReturnValue({
+      id: 'test',
+      isActive: true,
+      activate: jest.fn().mockResolvedValue(undefined),
+      exports: mockAPI
+    });
+    
+    await credentialManager.initialize();
+    const secret = await credentialManager.getCredential('non-existent-id');
     expect(secret).toBeUndefined();
   });
 
@@ -76,9 +102,22 @@ describe('CredentialManagerIntegration', () => {
       username: 'testuser'
     };
 
-    // Mock the secret retrieval
-    mockContext.secrets.get.mockResolvedValue('testpassword');
-
+    // Mock the credential manager extension API
+    const mockAPI = {
+      getCredential: jest.fn().mockResolvedValue('testpassword'),
+      setCredential: jest.fn(),
+      deleteCredential: jest.fn(),
+      listCredentials: jest.fn()
+    };
+    
+    vscode.extensions.getExtension.mockReturnValue({
+      id: 'test',
+      isActive: true,
+      activate: jest.fn().mockResolvedValue(undefined),
+      exports: mockAPI
+    });
+    
+    await credentialManager.initialize();
     const headers = await credentialManager.buildAuthHeaders(connection);
     expect(headers).toHaveProperty('Authorization');
     expect(headers.Authorization).toBe('Basic ' + Buffer.from('testuser:testpassword').toString('base64'));
@@ -93,9 +132,22 @@ describe('CredentialManagerIntegration', () => {
       authType: 'bearer' as const
     };
 
-    // Mock the secret retrieval
-    mockContext.secrets.get.mockResolvedValue('testtoken');
-
+    // Mock the credential manager extension API
+    const mockAPI = {
+      getCredential: jest.fn().mockResolvedValue('testtoken'),
+      setCredential: jest.fn(),
+      deleteCredential: jest.fn(),
+      listCredentials: jest.fn()
+    };
+    
+    vscode.extensions.getExtension.mockReturnValue({
+      id: 'test',
+      isActive: true,
+      activate: jest.fn().mockResolvedValue(undefined),
+      exports: mockAPI
+    });
+    
+    await credentialManager.initialize();
     const headers = await credentialManager.buildAuthHeaders(connection);
     expect(headers).toHaveProperty('Authorization');
     expect(headers.Authorization).toBe('Bearer testtoken');

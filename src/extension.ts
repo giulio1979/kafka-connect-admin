@@ -31,8 +31,9 @@ function extractSchemaString(payload: any): string | undefined {
   return undefined;
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   const credentialManager = new CredentialManagerIntegration(context);
+  await credentialManager.initialize();
 
   const treeProvider = new ConnectionsTreeProvider(context);
   vscode.window.registerTreeDataProvider('connectAdmin.connections', treeProvider);
@@ -52,14 +53,27 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Create simple status bar button for quick access to Credential Manager
   try {
-    const addItem: any = (vscode as any).window.createStatusBarItem((vscode as any).StatusBarAlignment.Left, 100);
+    const addItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000);
     addItem.command = 'credentialManager.openConnectionManager';
-    addItem.text = '$(organization) Connections';
-    addItem.tooltip = 'Open Connection Manager';
+    addItem.text = '$(link) Kafka';
+    addItem.tooltip = 'Open Kafka Connection Manager';
     addItem.show();
     context.subscriptions.push(addItem);
+    getOutputChannel().appendLine('[status] Created status bar item for Connection Manager');
   } catch (e) {
-    // ignore if StatusBar API isn't present in the shim
+    getOutputChannel().appendLine(`[status] Failed to create status bar item: ${e}`);
+    // Fallback for older VS Code versions
+    try {
+      const addItem: any = (vscode as any).window.createStatusBarItem((vscode as any).StatusBarAlignment.Left, 1000);
+      addItem.command = 'credentialManager.openConnectionManager';
+      addItem.text = '$(link) Kafka';
+      addItem.tooltip = 'Open Kafka Connection Manager';
+      addItem.show();
+      context.subscriptions.push(addItem);
+      getOutputChannel().appendLine('[status] Created status bar item using fallback method');
+    } catch (fallbackError) {
+      getOutputChannel().appendLine(`[status] Both methods failed: ${fallbackError}`);
+    }
   }
 
   // Open connector view (node is a serializable payload { meta, name })

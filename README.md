@@ -136,10 +136,16 @@ If you were using a previous version of this extension that had built-in connect
 	- Navigate to another Schema Registry connection (or a subject under a connection) and choose Paste Schema (or Paste Schema to Connection) to register the schema(s) there.
 	- When pasting, you can change the target subject name. The extension will attempt verification and will log diagnostics to the output channel.
 
-## Configuration & security
+## Configuration & Security
 
-- Secrets: username/password or bearer tokens are stored using the VS Code SecretStorage API and are never written to disk in plaintext.
-- The extension stores connection metadata (id, name, url, type, authType, username) in `globalState` under `connectAdmin.connections.v1`.
+**This extension now uses the Credential Manager extension for secure connection storage.**
+
+- **Connection metadata** (name, URL, type, auth type, username) is stored in VS Code workspace settings under `credentialManager.connections`
+- **Secrets** (passwords, bearer tokens) are securely stored using VS Code's encrypted SecretStorage API at `credentialManager.secret.{connectionId}`
+- **No plain text passwords** are stored in any configuration files
+- **Legacy migration**: Old connections stored in `connectAdmin.connections.v1` are no longer supported - please recreate connections using the Credential Manager
+
+For detailed information about the Credential Manager, see its extension documentation.
 
 ## Docker Compose (integration test environment)
 
