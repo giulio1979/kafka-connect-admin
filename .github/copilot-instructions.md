@@ -12,7 +12,6 @@
 - you document architecture of the project
 - you write tests for code and ensure high test coverage
 - you write testable code
-- i am using VSCODE in windows 11 and I run docker containers in WSL
 
 ## Known Issues & Solutions
 - **Multiple Connector View Stability (Fixed v0.0.5)**: Implemented per-connector panel isolation using Map-based panel management to prevent data mixing between multiple open connector views. Each connector now maintains its own webview panel instance with proper cleanup on disposal.
@@ -20,8 +19,10 @@
 - **Production Debug Logs (Fixed v0.0.5)**: Removed all console.log statements from production code and replaced with proper logging using VS Code output channel system. All debug information now goes through centralized getOutputChannel() with consistent formatting.
 - **Credential Manager Migration (Completed v0.1.3)**: Successfully migrated from built-in connection storage to external Credential Manager extension dependency. Connections are now stored in `credentialManager.connections` workspace settings with secrets in VS Code SecretStorage using key format `credentialManager.secret.{connectionId}`. Old connection storage in `connectAdmin.connections.v1` is deprecated.
 - **Security Vulnerability (Fixed v0.1.3)**: Fixed security issue by migrating to Credential Manager extension that uses VS Code's encrypted SecretStorage API instead of base64 encoded passwords in workspace settings.
+- **Schema Editor UX Confusion (Fixed v0.1.6)**: Resolved misleading schema editing interface that suggested schemas could be "edited" when they are actually immutable. Updated UI to clarify that any changes create a new version. Changed "Save Changes" button to "Register New Version", added prominent immutability warning, and updated success/error messages to reflect the true behavior. Schema Registry enforces immutability - existing versions cannot be modified, only new compatible versions can be registered.
 - **VS Code Extension Pattern**: For webview panels, always use unique identifiers and proper state isolation when dealing with multiple instances of the same view type.
 - **Memory Management**: Always implement proper cleanup in onDidDispose handlers to prevent memory leaks in long-running extension sessions.
 - **Panel Management Best Practice**: Use Map-based panel storage with unique identifiers rather than singleton patterns when multiple instances of the same view type need to coexist.
 - **Logging Best Practice**: Always use getOutputChannel().appendLine() for debug/info logging instead of console.log in VS Code extensions.
 - **Credential Manager Integration**: Always use the CredentialManagerIntegration class to access connections. The extension exposes an API with methods like getCredential(), setCredential(), deleteCredential(), and listCredentials(). Access connection metadata from workspace settings at `credentialManager.connections` and retrieve secrets using the extension's API methods, not directly from VS Code SecretStorage. Listen to workspace configuration changes for `credentialManager.connections` to detect connection updates.
+- **Schema Registry Immutability**: Always communicate clearly to users that Schema Registry enforces immutability. Existing schema versions cannot be modified - only new compatible versions can be registered. UI should use language like "Register New Version" rather than "Save" or "Edit" to avoid confusion.

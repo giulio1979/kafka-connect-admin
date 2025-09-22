@@ -5,7 +5,6 @@ import { ConnectorView } from './views/connectorView';
 import { OffsetEditor } from './views/offsetEditor';
 import { SchemaView } from './views/schemaView';
 import { getOutputChannel } from './logger';
-import { OfficialSchemaRegistryClient } from './clients/officialSchemaRegistryClient';
 
 // Try to extract a schema string from several possible payload shapes.
 function extractSchemaString(payload: any): string | undefined {
@@ -32,6 +31,8 @@ function extractSchemaString(payload: any): string | undefined {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  getOutputChannel().appendLine('[extension] Starting activation...');
+  
   const credentialManager = new CredentialManagerIntegration(context);
   await credentialManager.initialize();
 
@@ -40,6 +41,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const connectorView = new ConnectorView(context);
   const offsetEditor = new OffsetEditor(context);
   const schemaView = new SchemaView(context);
+
+  getOutputChannel().appendLine('[extension] Registering commands...');
 
   context.subscriptions.push(vscode.commands.registerCommand('connectAdmin.hello', () => {
     vscode.window.showInformationMessage('Connect Admin extension activated');
@@ -50,6 +53,8 @@ export async function activate(context: vscode.ExtensionContext) {
     getOutputChannel().appendLine('[cmd] refreshConnections invoked');
     treeProvider.refresh();
   }));
+
+  getOutputChannel().appendLine('[extension] Command connectAdmin.refreshConnections registered successfully');
 
   // Create simple status bar button for quick access to Credential Manager
   try {
@@ -535,18 +540,38 @@ export async function activate(context: vscode.ExtensionContext) {
     if (meta.type !== 'schema-registry') return vscode.window.showErrorMessage('Connection is not a schema registry');
     const headers = await credentialManager.buildAuthHeaders(meta);
     try {
-      // Convert headers to auth string for OfficialSchemaRegistryClient
-      let authString = '';
+      // Dynamic import to avoid loading the dependency during extension activation
+      const { OfficialSchemaRegistryClient } = await import('./clients/officialSchemaRegistryClient');
+      
+      // Build connection settings for the official client
+      const connectionSettings: any = { url: meta.url };
+      
+      // Convert auth headers to connection settings
       if (headers['Authorization']) {
-        authString = headers['Authorization'];
+        const authHeader = headers['Authorization'];
+        if (authHeader.startsWith('Basic ')) {
+          // Decode basic auth
+          const base64 = authHeader.substring(6);
+          const credentials = Buffer.from(base64, 'base64').toString();
+          const [username, password] = credentials.split(':');
+          connectionSettings.username = username;
+          connectionSettings.password = password;
+        } else if (authHeader.startsWith('Bearer ')) {
+          // Bearer token
+          connectionSettings.token = authHeader.substring(7);
+        }
       }
-      const official = new OfficialSchemaRegistryClient(meta.url, authString);
+      
+      const official = new OfficialSchemaRegistryClient(connectionSettings, meta.name);
       const subjects = await official.listSubjects();
       vscode.window.showInformationMessage(`Official client test successful! Found ${subjects.length} subjects.`);
     } catch (e: any) {
       vscode.window.showErrorMessage(`Official client test failed: ${e.message || e}`);
     }
   }));
+
+  getOutputChannel().appendLine('[extension] All commands registered successfully');
+  getOutputChannel().appendLine('[extension] Extension activation completed');
 }
 
 // Diagnostic helper: search all subjects to find one whose any-version schema equals the provided schema string

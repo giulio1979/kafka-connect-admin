@@ -231,6 +231,30 @@ export class SchemaView {
         .tab-content.active {
             display: block;
         }
+        .immutability-notice {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+            background: var(--vscode-inputValidation-warningBackground);
+            border: 1px solid var(--vscode-inputValidation-warningBorder);
+            border-radius: 4px;
+            color: var(--vscode-inputValidation-warningForeground);
+        }
+        .notice-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .notice-content {
+            flex: 1;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .notice-content strong {
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -239,14 +263,22 @@ export class SchemaView {
         <div class="actions">
             <button class="btn secondary" id="copyBtn">Copy</button>
             <button class="btn secondary" id="exportBtn">Export</button>
-            <button class="btn" id="saveBtn" ${isReadonly ? 'disabled' : ''}>Save Changes</button>
+            <button class="btn" id="saveBtn" ${isReadonly ? 'disabled' : ''}>Register New Version</button>
         </div>
     </div>
 
     <div class="tabs">
-        <button class="tab active" data-tab="editor">Schema Editor</button>
+        <button class="tab active" data-tab="editor">New Version Editor</button>
         ${isJsonSchema ? '<button class="tab" data-tab="fields">Fields</button>' : ''}
         <button class="tab" data-tab="raw">Raw JSON</button>
+    </div>
+
+    <div class="immutability-notice">
+        <div class="notice-icon">⚠️</div>
+        <div class="notice-content">
+            <strong>Schema Immutability:</strong> Existing schema versions cannot be modified. 
+            Any changes will create a new version (v${version + 1}) that must be compatible with the current compatibility setting.
+        </div>
     </div>
 
     <div class="tab-content active" id="editor-tab">
@@ -521,7 +553,7 @@ export class SchemaView {
 
             panel.webview.postMessage({ 
               command: 'showSuccess', 
-              text: `Schema saved successfully. New version: ${regResult.id || 'unknown'}` 
+              text: `New schema version registered successfully. Version: ${regResult.id || 'unknown'}` 
             });
 
             // Refresh the tree to show the new version
@@ -531,7 +563,7 @@ export class SchemaView {
             oc.appendLine(`[schema-view] Save failed: ${e.message || e}`);
             panel.webview.postMessage({ 
               command: 'showError', 
-              text: `Failed to save: ${e.message || e}` 
+              text: `Failed to register new version: ${e.message || e}` 
             });
           }
           break;
